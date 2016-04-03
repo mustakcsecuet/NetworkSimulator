@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
 	char welcome_msg[200];
 	char buffer[1024];
 
-	if (argc < 3) {
+	if (argc != 4) {
 		printf(
 				"Please provide with specified format: ./bridge lan_name num_ports\n");
 		return 0;
@@ -137,26 +137,37 @@ int main(int argc, char *argv[]) {
 			}
 
 			// new client information
-			printf("admin: connect from \'%s\' at \'%d\'\n", name->h_name,
+			printf("bridge: connect from \'%s\' at \'%d\'\n", name->h_name,
 					ntohs(cli_addr.sin_port));
 
-			// send new connection greeting message
-			sprintf(
-					welcome_msg,
-					"admin: connected to server on \'%s\' at \'%d\' thru \'%d\'\n",
-					name->h_name, bridgePortNo, ntohs(cli_addr.sin_port));
-			if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg), 0)
-					!= strlen(welcome_msg)) {
-				perror("send");
-			}
-
-			// add new socket to array of sockets
-			for (i = 0; i < mNumPorts; i++) {
-				// if position is empty
-				if (client_socket[i] == 0) {
-					client_socket[i] = newConnectionSockfd;
-					break;
+			if (max_sd < mNumPorts) {
+				// send successful connection greeting message
+				sprintf(welcome_msg,
+						"success: connected to server on \'%s\' at \'%d\' thru \'%d\'\n",
+						name->h_name, bridgePortNo, ntohs(cli_addr.sin_port));
+				if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg),
+						0) != strlen(welcome_msg)) {
+					perror("send");
 				}
+
+				// add new socket to array of sockets
+				for (i = 0; i < mNumPorts; i++) {
+					// if position is empty
+					if (client_socket[i] == 0) {
+						client_socket[i] = newConnectionSockfd;
+						break;
+					}
+				}
+			} else {
+				// send reject connection message
+				sprintf(welcome_msg,
+						"reject: connected to server on \'%s\' at \'%d\' thru \'%d\'\n",
+						name->h_name, bridgePortNo, ntohs(cli_addr.sin_port));
+				if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg),
+						0) != strlen(welcome_msg)) {
+					perror("send");
+				}
+				close(newConnectionSockfd);
 			}
 		}
 
@@ -172,7 +183,7 @@ int main(int argc, char *argv[]) {
 					// Somebody disconnected , get his details and print
 					getpeername(sd, (struct sockaddr*) &cli_addr,
 							(socklen_t*) &clilen);
-					printf("admin: disconnect from \'%s(%d)\'\n", name->h_name,
+					printf("bridge: disconnect from \'%s(%d)\'\n", name->h_name,
 							ntohs(cli_addr.sin_port));
 
 					// Close the socket and mark as 0 in list for reuse
@@ -184,11 +195,10 @@ int main(int argc, char *argv[]) {
 				else {
 					//set the string terminating NULL byte on the end of the data read
 					buffer[msglen] = '\0';
-					printf("%s(%d): %s", name->h_name,
-							ntohs(cli_addr.sin_port), buffer);
-					for (j = 0; j < mNumPorts; j++)
-						if (client_socket[j] != 0 && sd != client_socket[j])
-							send(client_socket[j], buffer, strlen(buffer), 0);
+					/*printf("%s(%d): %s", name->h_name, ntohs(cli_addr.sin_port),
+					 buffer);*/
+					// TODO forward message according to switch table
+					//send(where_to_send, buffer, strlen(buffer), 0);
 				}
 			}
 		}
@@ -201,5 +211,6 @@ int main(int argc, char *argv[]) {
 	 */
 
 	close(bridgeSockfd);
+	return 0;
 }
 /*----------------------------------------------------------------*/
