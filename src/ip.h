@@ -18,6 +18,7 @@ typedef unsigned long IPAddr;
 typedef struct iface {
    char ifacename[32];
    IPAddr ipaddr;
+   IPAddr mask;
    MacAddr macaddr;
    char lanname[32];
 } Iface;
