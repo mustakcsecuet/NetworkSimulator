@@ -14,6 +14,7 @@
 #include <string.h>
 #include <strings.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "ip.h"
 /*----------------------------------------------------------------*/
 
@@ -195,6 +196,16 @@ Rtable getRouting(char *hostName) {
 /* usage: station <-no -route> interface routingtable hostname */
 int main(int argc, char *argv[]) {
 
+	int sockfd, portno, n;
+	struct sockaddr_in serv_addr;
+	struct hostent *server;
+
+	pid_t pid;
+	int sts;
+
+	char r_buffer[1024];
+	char w_buffer[1024];
+
 	/* initialization of hosts, interface, and routing tables */
 	if (argc != 6) {
 		printf(
@@ -214,16 +225,86 @@ int main(int argc, char *argv[]) {
 	 * note that a station may need to be connected to multilple lans
 	 */
 
-	/* monitoring input from users and bridges
-	 * 1. from user: analyze the user input and send to the destination if necessary
-	 * 2. from bridge: check if it is for the station. Note two types of data
-	 * in the ethernet frame: ARP packet and IP packet.
-	 *
-	 * for a router, it may need to forward the IP packet
-	 */
+	if (strcmp(argv[1], "-no") == 0) {
+		// TODO code for station
+		for (int i = 0; i < intr_cnt; i++) {
+			char *name = iface_list[i].lanname;
 
-	while (1) {
+			char ip[100] = ".";
+			strcat(ip, name);
+			ip[strlen(ip) - 1] = '\0';
+			strcat(ip, ".addr");
 
+			char port[100] = ".";
+			strcat(port, name);
+			port[strlen(port) - 1] = '\0';
+			strcat(port, ".port");
+
+			char ipAddr[1024];
+			size_t len;
+			if ((len = readlink(ip, ipAddr, sizeof(ipAddr) - 1)) != -1)
+				ipAddr[len] = '\0';
+
+			char portNo[1024];
+			if ((len = readlink(port, portNo, sizeof(portNo) - 1)) != -1)
+				portNo[len] = '\0';
+
+			portno = htons(atoi(portNo));
+
+			// create socket
+			int servSocket = socket(AF_INET, SOCK_STREAM, 0);
+			if (servSocket < 0)
+				printf("ERROR opening socket");
+
+			// server configuration
+			bzero((char *) &serv_addr, sizeof(serv_addr));
+			serv_addr.sin_family = AF_INET;
+			inet_aton(ipAddr, (struct in_addr *) &serv_addr.sin_addr.s_addr);
+			serv_addr.sin_port = portno;
+
+			// connect to server
+			if (connect(servSocket, (struct sockaddr *) &serv_addr,
+					sizeof(serv_addr)) < 0)
+				printf("ERROR connecting");
+
+			strcpy(link_socket[i].ifacename,name);
+			link_socket[i].sockfd = servSocket;
+
+			/*pid = fork();
+
+			// new process to read from server
+			if (pid == 0) {
+				while (1) {
+					bzero(r_buffer, 1024);
+					n = read(sockfd, r_buffer, 1024);
+					if (n < 0)
+						error("ERROR reading from socket");
+					if (strstr(r_buffer, "admin:") != NULL)
+						printf("%s", r_buffer);
+					else
+						printf(">>%s", r_buffer);
+				}
+			} else if (pid > 0) {
+				// parent process will be responsible for write
+				while (1) {
+					bzero(w_buffer, 1024);
+					fgets(w_buffer, 1023, stdin);
+
+					if (strcmp(w_buffer, "e\n") == 0) {
+						printf("Leaving the station!!!\n");
+						kill(pid, SIGKILL);
+						return 0;
+					}
+
+					n = write(sockfd, w_buffer, strlen(w_buffer));
+					if (n < 0)
+						error("ERROR writing to socket");
+				}
+				waitpid(pid, &sts, 0);
+			}*/
+		}
+	} else if (strcmp(argv[1], "-route") == 0) {
+		// TODO code for router
 	}
 
 	return 0;
