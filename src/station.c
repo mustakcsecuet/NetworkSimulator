@@ -321,8 +321,8 @@ int main(int argc, char *argv[]) {
 
 				// TODO should we send the packet to both bridge that a host connects or one of them?
 				/*n = write(which_bridge_to_use, w_buffer, strlen(w_buffer));
-				if (n < 0)
-					error("ERROR writing to socket");*/
+				 if (n < 0)
+				 error("ERROR writing to socket");*/
 			}
 		}
 
