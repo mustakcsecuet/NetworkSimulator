@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 	int bridgePortNo;
 
 	fd_set readfds;
-	int max_sd, sd;
+	int max_sd, sd, clCounter;
 
 	int activity, msglen;
 	int i, j;
@@ -52,6 +52,9 @@ int main(int argc, char *argv[]) {
 
 	mNumPorts = atoi(argv[2]);
 	int client_socket[mNumPorts];
+	for (i = 0; i < mNumPorts; i++) {
+		client_socket[i] = 0;
+	}
 
 	/*printf("Test: lan name -> %s\n", mLanName);
 	 printf("Test: num ports -> %d\n", mNumPorts);*/
@@ -97,6 +100,9 @@ int main(int argc, char *argv[]) {
 	sprintf(temp, "%d", bridgePortNo);
 	symlink(temp, linkPortName);
 
+	clilen = sizeof(cli_addr);
+	clCounter = 0;
+
 	// TODO Just copied the listen, read, send methods
 	// TODO Need to modify the codes for project specific requirements
 	while (1) {
@@ -137,17 +143,18 @@ int main(int argc, char *argv[]) {
 			}
 
 			// new client information
-			printf("bridge: connect from \'%s\' at \'%d\'\n", name->h_name,
+			printf("bridge: connect from at \'%d\'\n",
 					ntohs(cli_addr.sin_port));
+			clCounter++;
 
-			if (max_sd < mNumPorts) {
+			if (clCounter <= mNumPorts) {
 				// send successful connection greeting message
 				sprintf(welcome_msg,
-						"success: connected to server on \'%s\' at \'%d\' thru \'%d\'\n",
-						name->h_name, bridgePortNo, ntohs(cli_addr.sin_port));
+						"success: connected to bridge on at \'%d\' thru \'%d\'\n",
+						bridgePortNo, ntohs(cli_addr.sin_port));
 				if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg),
 						0) != strlen(welcome_msg)) {
-					perror("send");
+					printf("send");
 				}
 
 				// add new socket to array of sockets
@@ -161,8 +168,8 @@ int main(int argc, char *argv[]) {
 			} else {
 				// send reject connection message
 				sprintf(welcome_msg,
-						"reject: connected to server on \'%s\' at \'%d\' thru \'%d\'\n",
-						name->h_name, bridgePortNo, ntohs(cli_addr.sin_port));
+						"reject: connected to bridge at \'%d\' thru \'%d\'\n",
+						bridgePortNo, ntohs(cli_addr.sin_port));
 				if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg),
 						0) != strlen(welcome_msg)) {
 					perror("send");
@@ -183,20 +190,20 @@ int main(int argc, char *argv[]) {
 					// Somebody disconnected , get his details and print
 					getpeername(sd, (struct sockaddr*) &cli_addr,
 							(socklen_t*) &clilen);
-					printf("bridge: disconnect from \'%s(%d)\'\n", name->h_name,
+					printf("bridge: disconnect at %d\'\n",
 							ntohs(cli_addr.sin_port));
 
 					// Close the socket and mark as 0 in list for reuse
 					close(sd);
 					client_socket[i] = 0;
+					clCounter--;
 				}
 
 				// Forward the message that came in
 				else {
 					//set the string terminating NULL byte on the end of the data read
 					buffer[msglen] = '\0';
-					/*printf("%s(%d): %s", name->h_name, ntohs(cli_addr.sin_port),
-					 buffer);*/
+					printf("%d: %s", ntohs(cli_addr.sin_port), buffer);
 					// TODO forward message according to switch table
 					//send(where_to_send, buffer, strlen(buffer), 0);
 				}

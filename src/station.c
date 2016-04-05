@@ -54,7 +54,7 @@ void readFromHosts() {
 	}
 
 	// usage: to read sequentially from hostname and hostIP
-	/*for (int i = 0; i < hostcnt; i++) {
+	/*for (i = 0; i < hostcnt; i++) {
 	 printf("name: %s; IP: %ld\n", host[i].name, host[i].addr);
 	 }*/
 
@@ -62,7 +62,8 @@ void readFromHosts() {
 }
 
 Host getHost(char *hostName) {
-	for (int i = 0; i < hostcnt; i++) {
+	int i;
+	for (i = 0; i < hostcnt; i++) {
 		if (strcmp(host[i].name, hostName) == 0)
 			return host[i];
 	}
@@ -112,7 +113,7 @@ void readFromInterface() {
 	}
 
 	// usage: to read sequentially from hostname and hostIP
-	/*for (int i = 0; i < intr_cnt; i++) {
+	/*for (i = 0; i < intr_cnt; i++) {
 	 printf("name: %s; IP: %ld; Mask: %ld; Mac: %s; Lan %s\n",
 	 iface_list[i].ifacename, iface_list[i].ipaddr, iface_list[i].mask,
 	 iface_list[i].macaddr, iface_list[i].lanname);
@@ -122,7 +123,8 @@ void readFromInterface() {
 }
 
 Iface getInterface(char *hostName) {
-	for (int i = 0; i < hostcnt; i++) {
+	int i;
+	for (i = 0; i < hostcnt; i++) {
 		if (strcmp(iface_list[i].ifacename, hostName) == 0)
 			return iface_list[i];
 	}
@@ -171,7 +173,7 @@ void readFromRouting() {
 	}
 
 	// usage: to read sequentially from hostname and hostIP
-	/*for (int i = 0; i < intr_cnt; i++) {
+	/*for (i = 0; i < intr_cnt; i++) {
 	 printf("Dest: %ld; Next: %ld; Mask: %ld; Name %s\n",
 	 rt_table[i].destsubnet, rt_table[i].nexthop, rt_table[i].mask,
 	 rt_table[i].ifacename);
@@ -182,7 +184,8 @@ void readFromRouting() {
 }
 
 Rtable getRouting(char *hostName) {
-	for (int i = 0; i < hostcnt; i++) {
+	int i;
+	for (i = 0; i < hostcnt; i++) {
 		if (strcmp(rt_table[i].ifacename, hostName) == 0)
 			return rt_table[i];
 	}
@@ -196,7 +199,7 @@ Rtable getRouting(char *hostName) {
 /* usage: station <-no -route> interface routingtable hostname */
 int main(int argc, char *argv[]) {
 
-	int sockfd, portno, n;
+	int portno, n;
 	struct sockaddr_in serv_addr;
 	struct hostent *server;
 
@@ -227,7 +230,8 @@ int main(int argc, char *argv[]) {
 
 	if (strcmp(argv[1], "-no") == 0) {
 		// TODO code for station
-		for (int i = 0; i < intr_cnt; i++) {
+		int i;
+		for (i = 0; i < intr_cnt; i++) {
 			char *name = iface_list[i].lanname;
 
 			char ip[100] = ".";
@@ -267,46 +271,50 @@ int main(int argc, char *argv[]) {
 					sizeof(serv_addr)) < 0)
 				printf("ERROR connecting");
 
-			strcpy(link_socket[i].ifacename,name);
+			strcpy(link_socket[i].ifacename, name);
 			link_socket[i].sockfd = servSocket;
 
-			/*pid = fork();
+			printf("%s %d\n", ipAddr, portno);
+
+			pid = fork();
 
 			// new process to read from server
 			if (pid == 0) {
 				while (1) {
 					bzero(r_buffer, 1024);
-					n = read(sockfd, r_buffer, 1024);
+					n = read(servSocket, r_buffer, 1024);
 					if (n < 0)
-						error("ERROR reading from socket");
-					if (strstr(r_buffer, "admin:") != NULL)
-						printf("%s", r_buffer);
-					else
-						printf(">>%s", r_buffer);
+						printf("ERROR reading from socket");
+					else if(n==0)
+						kill(getpid(), SIGINT);
+
+					printf(">> %s", r_buffer);
 				}
 			} else if (pid > 0) {
-				// parent process will be responsible for write
-				while (1) {
-					bzero(w_buffer, 1024);
-					fgets(w_buffer, 1023, stdin);
-
-					if (strcmp(w_buffer, "e\n") == 0) {
-						printf("Leaving the station!!!\n");
-						kill(pid, SIGKILL);
-						return 0;
-					}
-
-					n = write(sockfd, w_buffer, strlen(w_buffer));
-					if (n < 0)
-						error("ERROR writing to socket");
-				}
 				waitpid(pid, &sts, 0);
-			}*/
+			}
 		}
+
+		// parent process will be responsible for write
+		while (1) {/*
+		 bzero(w_buffer, 1024);
+		 fgets(w_buffer, 1023, stdin);
+
+		 if (strcmp(w_buffer, "e\n") == 0) {
+		 printf("Leaving the station!!!\n");
+		 kill(pid, SIGKILL);
+		 return 0;
+		 }
+
+		 n = write(sockfd, w_buffer, strlen(w_buffer));
+		 if (n < 0)
+		 error("ERROR writing to socket");
+		 */
+		}
+
 	} else if (strcmp(argv[1], "-route") == 0) {
 		// TODO code for router
 	}
 
 	return 0;
 }
-
