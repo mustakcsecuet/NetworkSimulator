@@ -271,9 +271,6 @@ int main(int argc, char *argv[]) {
 					sizeof(serv_addr)) < 0)
 				printf("ERROR connecting");
 
-			strcpy(link_socket[i].ifacename, name);
-			link_socket[i].sockfd = servSocket;
-
 			printf("%s %d\n", ipAddr, portno);
 
 			pid = fork();
@@ -283,12 +280,19 @@ int main(int argc, char *argv[]) {
 				while (1) {
 					bzero(r_buffer, 1024);
 					n = read(servSocket, r_buffer, 1024);
-					if (n < 0)
+					if (n < 0) {
 						printf("ERROR reading from socket");
-					else if(n==0)
+					} else if (n == 0) {
+						printf("Disconnected from bridge\n");
 						kill(getpid(), SIGINT);
+					}
 
-					printf(">> %s", r_buffer);
+					if (strcmp("success", r_buffer) == 0) {
+						strcpy(link_socket[i].ifacename, name);
+						link_socket[i].sockfd = servSocket;
+					} else {
+						printf(">> %s", r_buffer);
+					}
 				}
 			} else if (pid > 0) {
 				waitpid(pid, &sts, 0);
@@ -296,20 +300,30 @@ int main(int argc, char *argv[]) {
 		}
 
 		// parent process will be responsible for write
-		while (1) {/*
-		 bzero(w_buffer, 1024);
-		 fgets(w_buffer, 1023, stdin);
+		while (1) {
+			bzero(w_buffer, 1024);
+			fgets(w_buffer, 1023, stdin);
 
-		 if (strcmp(w_buffer, "e\n") == 0) {
-		 printf("Leaving the station!!!\n");
-		 kill(pid, SIGKILL);
-		 return 0;
-		 }
+			if (strcmp(w_buffer, "e\n") == 0) {
+				printf("Leaving the station!!!\n");
+				kill(pid, SIGKILL);
+				return 0;
+			}
 
-		 n = write(sockfd, w_buffer, strlen(w_buffer));
-		 if (n < 0)
-		 error("ERROR writing to socket");
-		 */
+			char *to = strtok(w_buffer, " ");
+
+			Host toHost = getHost(to);
+			if (strlen(toHost.name) == 0) {
+				printf("Host information unidentifiable!!!\n");
+			} else {
+				IPAddr toHostIP = toHost.addr;
+				// TODO packet encapsulation required
+
+				// TODO should we send the packet to both bridge that a host connects or one of them?
+				/*n = write(which_bridge_to_use, w_buffer, strlen(w_buffer));
+				if (n < 0)
+					error("ERROR writing to socket");*/
+			}
 		}
 
 	} else if (strcmp(argv[1], "-route") == 0) {

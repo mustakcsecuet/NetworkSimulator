@@ -149,9 +149,7 @@ int main(int argc, char *argv[]) {
 
 			if (clCounter <= mNumPorts) {
 				// send successful connection greeting message
-				sprintf(welcome_msg,
-						"success: connected to bridge on at \'%d\' thru \'%d\'\n",
-						bridgePortNo, ntohs(cli_addr.sin_port));
+				sprintf(welcome_msg, "success");
 				if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg),
 						0) != strlen(welcome_msg)) {
 					printf("send");
@@ -167,9 +165,7 @@ int main(int argc, char *argv[]) {
 				}
 			} else {
 				// send reject connection message
-				sprintf(welcome_msg,
-						"reject: connected to bridge at \'%d\' thru \'%d\'\n",
-						bridgePortNo, ntohs(cli_addr.sin_port));
+				sprintf(welcome_msg, "reject");
 				if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg),
 						0) != strlen(welcome_msg)) {
 					perror("send");
