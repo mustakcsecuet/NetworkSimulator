@@ -22,6 +22,14 @@ char ifsFile[100];
 char rouFile[100];
 char hostFile[100];
 
+int isSameNetwork(IPAddr destSubnet, IPAddr mask, IPAddr checkIP) {
+	IPAddr possible = checkIP & mask;
+	if (possible == destSubnet)
+		return 1;
+
+	return 0;
+}
+
 void readFromHosts() {
 	FILE *fp;
 	char *line = NULL;
@@ -61,15 +69,14 @@ void readFromHosts() {
 	fclose(fp);
 }
 
-Host getHost(char *hostName) {
+int getHost(char *hostName) {
 	int i;
 	for (i = 0; i < hostcnt; i++) {
 		if (strcmp(host[i].name, hostName) == 0)
-			return host[i];
+			return i;
 	}
 
-	Host host;
-	return host;
+	return -1;
 }
 
 void readFromInterface() {
@@ -122,15 +129,15 @@ void readFromInterface() {
 	fclose(fp);
 }
 
-Iface getInterface(char *hostName) {
+int getInterface(IPAddr destIP) {
 	int i;
 	for (i = 0; i < hostcnt; i++) {
-		if (strcmp(iface_list[i].ifacename, hostName) == 0)
-			return iface_list[i];
+		if (isSameNetwork(destIP, iface_list[i].mask, iface_list[i].ipaddr)
+				== 1)
+			return i;
 	}
 
-	Iface iface;
-	return iface;
+	return -1;
 }
 
 void readFromRouting() {
@@ -183,15 +190,15 @@ void readFromRouting() {
 
 }
 
-Rtable getRouting(char *hostName) {
+int getRouting(IPAddr hostIP) {
 	int i;
 	for (i = 0; i < hostcnt; i++) {
-		if (strcmp(rt_table[i].ifacename, hostName) == 0)
-			return rt_table[i];
+		if (isSameNetwork(rt_table[i].destsubnet, rt_table[i].mask, hostIP)
+				== 1)
+			return i;
 	}
 
-	Rtable rtable;
-	return rtable;
+	return -1;
 }
 
 /*----------------------------------------------------------------*/
@@ -294,8 +301,6 @@ int main(int argc, char *argv[]) {
 						printf(">> %s", r_buffer);
 					}
 				}
-			} else if (pid > 0) {
-				waitpid(pid, &sts, 0);
 			}
 		}
 
@@ -304,25 +309,36 @@ int main(int argc, char *argv[]) {
 			bzero(w_buffer, 1024);
 			fgets(w_buffer, 1023, stdin);
 
-			if (strcmp(w_buffer, "e\n") == 0) {
-				printf("Leaving the station!!!\n");
-				kill(pid, SIGKILL);
-				return 0;
-			}
-
 			char *to = strtok(w_buffer, " ");
 
-			Host toHost = getHost(to);
-			if (strlen(toHost.name) == 0) {
+			int toHost = getHost(to);
+			if (toHost == -1) {
 				printf("Host information unidentifiable!!!\n");
 			} else {
-				IPAddr toHostIP = toHost.addr;
-				// TODO packet encapsulation required
+				IPAddr toHostIP = host[toHost].addr;
+				int toRoute = getRouting(toHostIP);
 
-				// TODO should we send the packet to both bridge that a host connects or one of them?
-				/*n = write(which_bridge_to_use, w_buffer, strlen(w_buffer));
-				 if (n < 0)
-				 error("ERROR writing to socket");*/
+				if (toRoute != -1) {
+					printf("Interface Name: %s\n", rt_table[toRoute].ifacename);
+					int toIntf = getInterface(rt_table[toRoute].destsubnet);
+
+					if (toIntf != -1) {
+						MacAddr destMac;
+						strcpy(destMac,iface_list[toIntf].macaddr);
+
+						printf("Destination MAC: %s\n", destMac);
+						// TODO packet encapsulation required
+
+						// TODO should we send the packet to both bridge that a host connects or one of them?
+						/*n = write(which_bridge_to_use, w_buffer, strlen(w_buffer));
+						 if (n < 0)
+						 error("ERROR writing to socket");*/
+					} else {
+						printf("Interface information not found\n");
+					}
+				} else {
+					printf("Route information not found\n");
+				}
 			}
 		}
 
