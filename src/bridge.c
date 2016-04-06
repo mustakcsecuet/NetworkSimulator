@@ -29,7 +29,6 @@ int main(int argc, char *argv[]) {
 
 	struct sockaddr_in serv_addr, cli_addr;
 	socklen_t clilen;
-	struct hostent *name;
 
 	char bridgeIP[100];
 	int bridgePortNo;
@@ -38,7 +37,7 @@ int main(int argc, char *argv[]) {
 	int max_sd, sd, clCounter;
 
 	int activity, msglen;
-	int i, j;
+	int i;
 	char welcome_msg[200];
 	char buffer[1024];
 
@@ -143,8 +142,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			// new client information
-			printf("bridge: connect from at \'%d\'\n",
-					ntohs(cli_addr.sin_port));
+			printf("bridge: connect from at \'%d\'\n", ntohs(cli_addr.sin_port));
 			clCounter++;
 
 			if (clCounter <= mNumPorts) {
@@ -199,6 +197,8 @@ int main(int argc, char *argv[]) {
 				else {
 					//set the string terminating NULL byte on the end of the data read
 					buffer[msglen] = '\0';
+					getpeername(sd, (struct sockaddr*) &cli_addr,
+							(socklen_t*) &clilen);
 					printf("%d: %s", ntohs(cli_addr.sin_port), buffer);
 					// TODO forward message according to switch table
 					//send(where_to_send, buffer, strlen(buffer), 0);
