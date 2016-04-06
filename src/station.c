@@ -30,6 +30,16 @@ int isSameNetwork(IPAddr destSubnet, IPAddr mask, IPAddr checkIP) {
 	return 0;
 }
 
+int getSocket(char *lanName) {
+	int i;
+	for (i = 0; i < intr_cnt; i++) {
+		if (strcmp(link_socket[i].ifacename, lanName) == 0)
+			return i;
+	}
+
+	return -1;
+}
+
 void readFromHosts() {
 	FILE *fp;
 	char *line = NULL;
@@ -296,6 +306,7 @@ int main(int argc, char *argv[]) {
 
 					if (strcmp("success", r_buffer) == 0) {
 						strcpy(link_socket[i].ifacename, name);
+						printf("Name: %s\n", name);
 						link_socket[i].sockfd = servSocket;
 					} else {
 						printf(">> %s", r_buffer);
@@ -324,9 +335,15 @@ int main(int argc, char *argv[]) {
 
 					if (toIntf != -1) {
 						MacAddr destMac;
-						strcpy(destMac,iface_list[toIntf].macaddr);
+						strcpy(destMac, iface_list[toIntf].macaddr);
+
+						int toSocket = getSocket(iface_list[toIntf].ifacename);
 
 						printf("Destination MAC: %s\n", destMac);
+
+						printf("Need to send in this socket %s => %d\n",
+								iface_list[toIntf].ifacename,
+								link_socket[toSocket].sockfd);
 						// TODO packet encapsulation required
 
 						// TODO should we send the packet to both bridge that a host connects or one of them?
