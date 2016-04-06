@@ -33,6 +33,7 @@ int isSameNetwork(IPAddr destSubnet, IPAddr mask, IPAddr checkIP) {
 int getSocket(char *lanName) {
 	int i;
 	for (i = 0; i < intr_cnt; i++) {
+		printf("%s %d\n", link_socket[i].ifacename, link_socket[i].sockfd);
 		if (strcmp(link_socket[i].ifacename, lanName) == 0)
 			return i;
 	}
@@ -290,6 +291,29 @@ int main(int argc, char *argv[]) {
 
 			printf("%s %d\n", ipAddr, portno);
 
+			// Add this portion to only check if connection succeed or rejected
+			// FIXME required to convert it non-blocking for 5 times tries using fcntl()
+			while (1) {
+				bzero(r_buffer, 1024);
+				n = read(servSocket, r_buffer, 1024);
+				if (n < 0) {
+					printf("ERROR reading from socket");
+				} else if (n == 0) {
+					break;
+					printf("Disconnected from bridge\n");
+				}
+
+				if (strcmp("success", r_buffer) == 0) {
+					printf("%d %d\n", i, servSocket);
+					strcpy(link_socket[i].ifacename, name);
+					link_socket[i].sockfd = servSocket;
+					break;
+				} else {
+					printf(">> %s", r_buffer);
+					break;
+				}
+			}
+
 			pid = fork();
 
 			// new process to read from server
@@ -303,14 +327,7 @@ int main(int argc, char *argv[]) {
 						printf("Disconnected from bridge\n");
 						kill(getpid(), SIGINT);
 					}
-
-					if (strcmp("success", r_buffer) == 0) {
-						strcpy(link_socket[i].ifacename, name);
-						printf("Name: %s\n", name);
-						link_socket[i].sockfd = servSocket;
-					} else {
-						printf(">> %s", r_buffer);
-					}
+					printf(">> %s", r_buffer);
 				}
 			}
 		}
@@ -337,7 +354,7 @@ int main(int argc, char *argv[]) {
 						MacAddr destMac;
 						strcpy(destMac, iface_list[toIntf].macaddr);
 
-						int toSocket = getSocket(iface_list[toIntf].ifacename);
+						int toSocket = getSocket(iface_list[toIntf].lanname);
 
 						printf("Destination MAC: %s\n", destMac);
 
