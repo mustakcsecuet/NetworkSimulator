@@ -33,7 +33,6 @@ int isSameNetwork(IPAddr destSubnet, IPAddr mask, IPAddr checkIP) {
 int getSocket(char *lanName) {
 	int i;
 	for (i = 0; i < intr_cnt; i++) {
-		printf("%s %d\n", link_socket[i].ifacename, link_socket[i].sockfd);
 		if (strcmp(link_socket[i].ifacename, lanName) == 0)
 			return i;
 	}
@@ -284,16 +283,18 @@ int main(int argc, char *argv[]) {
 			inet_aton(ipAddr, (struct in_addr *) &serv_addr.sin_addr.s_addr);
 			serv_addr.sin_port = portno;
 
-			// connect to server
-			if (connect(servSocket, (struct sockaddr *) &serv_addr,
-					sizeof(serv_addr)) < 0)
-				printf("ERROR connecting");
+			int counterTime = 0;
+			while (counterTime < 6) {
+				// connect to server
+				if (connect(servSocket, (struct sockaddr *) &serv_addr,
+						sizeof(serv_addr)) < 0)
+					printf("ERROR connecting");
 
-			printf("%s %d\n", ipAddr, portno);
+				printf("%s %d\n", ipAddr, portno);
 
-			// Add this portion to only check if connection succeed or rejected
-			// FIXME required to convert it non-blocking for 5 times tries using fcntl()
-			while (1) {
+				sleep(2);
+				// Add this portion to only check if connection succeed or rejected
+
 				bzero(r_buffer, 1024);
 				n = read(servSocket, r_buffer, 1024);
 				if (n < 0) {
@@ -312,6 +313,8 @@ int main(int argc, char *argv[]) {
 					printf(">> %s", r_buffer);
 					break;
 				}
+
+				counterTime++;
 			}
 
 			pid = fork();
@@ -359,7 +362,7 @@ int main(int argc, char *argv[]) {
 						printf("Destination MAC: %s\n", destMac);
 
 						printf("Need to send in this socket %s => %d\n",
-								iface_list[toIntf].ifacename,
+								iface_list[toIntf].lanname,
 								link_socket[toSocket].sockfd);
 						// TODO packet encapsulation required
 
