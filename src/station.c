@@ -22,6 +22,16 @@ char ifsFile[100];
 char rouFile[100];
 char hostFile[100];
 
+int isMyMac(MacAddr checkMac) {
+	int i;
+	for (i = 0; i < hostcnt; i++) {
+		if (iface_list[i].macaddr == checkMac)
+			return 1;
+	}
+
+	return 0;
+}
+
 int isSameNetwork(IPAddr destSubnet, IPAddr mask, IPAddr checkIP) {
 	IPAddr possible = checkIP & mask;
 	if (possible == destSubnet)
@@ -329,8 +339,18 @@ int main(int argc, char *argv[]) {
 					} else if (n == 0) {
 						printf("Disconnected from bridge\n");
 						kill(getpid(), SIGINT);
+					} else {
+						// TODO message received to a station
+						// INFO two cases: if destination mac is his mac
+						// INFO show the message
+						// INFO else don't need to show the message
+
+						/*
+						 * if(isMyMac(destMac) == 1)
+						 *   printf(">> %s", r_buffer);
+						 */
+						printf(">> %s", r_buffer);
 					}
-					printf(">> %s", r_buffer);
 				}
 			}
 		}
@@ -369,9 +389,10 @@ int main(int argc, char *argv[]) {
 
 						// Start: Temporary change to send message to bridge
 
-						n = write(link_socket[toSocket].sockfd, messageToSend, strlen(messageToSend));
+						n = write(link_socket[toSocket].sockfd, messageToSend,
+								strlen(messageToSend));
 
-						if(n < 0)
+						if (n < 0)
 							printf("Error: writing to socket!!!\n");
 
 						printf("write to %d\n", link_socket[toSocket].sockfd);
