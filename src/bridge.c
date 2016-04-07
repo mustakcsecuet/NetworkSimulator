@@ -240,7 +240,31 @@ int main(int argc, char *argv[]) {
 
 					// CALL pushToLearning(MacAddr macAddress, int socket i.e. sd here)
 
-					// TODO forward message according to larning table
+					// TODO forward message according to larningg table
+					// INFO first look for the learning table if we already
+					// INFO know which socket to forward
+					// INFO if socket informaiton is not in learning table
+					// INFO broadcast to all socket except the socket sd
+
+					// CALL getSocketFromLearning(MacAddr mac)
+					/*
+					 * int toSocket = getSocketFromLearning(destMac);
+					 */
+					// TODO If find in learning table, send to specific socket
+					// TODO else send it to all available socket except sd
+
+					/*
+					 * if(toSocket != -1){
+					 * 	send(learningTable[toSocket].socket, buffer, strlen(buffer), 0);
+					 * } else {
+					 *  int j;
+					 * 	for(j=0;j<mNumPorts;j++){
+					 * 	    if(sd != client_socket[j])
+					 * 		  send(client_socket[j], buffer, strlen(buffer), 0);
+					 * 	}
+					 * }
+					 */
+
 					//send(where_to_send, buffer, strlen(buffer), 0);
 				}
 			}
