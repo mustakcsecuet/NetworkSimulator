@@ -1,19 +1,15 @@
-CC     = gcc
-CFLAGS = -g
-INCLUDES = ether.h ip.h
-CFLAGS = -c -g
+# the compiler to use
+CC=g++
+# options pass to the compiler
+CFLAGS=-g -Wall -lpthread
 
-all: bridge station 
+all: station bridge
 
-bridge: bridge.o
-	gcc -g bridge.o -o bridge
+station: station.cpp DataIO.cpp ByteIO.cpp
+	$(CC) station.cpp DataIO.cpp ByteIO.cpp -o $@ $(CFLAGS)
 
-station: station.o
-	gcc -g station.o -o station
+bridge: bridge.cpp
+	$(CC) bridge.cpp DataIO.cpp ByteIO.cpp -o $@ $(CFLAGS)
 
-clean : 
-	rm -f bridge station *.o
-
-%.o : %.c $(INCLUDES)
-	$(CC) $(CFLAGS) $<
-
+clean:
+	rm -rf *o station bridge
