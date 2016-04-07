@@ -341,6 +341,7 @@ int main(int argc, char *argv[]) {
 			fgets(w_buffer, 1023, stdin);
 
 			char *to = strtok(w_buffer, " ");
+			char *messageToSend = strtok(NULL, "\n");
 
 			int toHost = getHost(to);
 			if (toHost == -1) {
@@ -365,6 +366,17 @@ int main(int argc, char *argv[]) {
 								iface_list[toIntf].lanname,
 								link_socket[toSocket].sockfd);
 						// TODO packet encapsulation required
+
+						// Start: Temporary change to send message to bridge
+
+						n = write(link_socket[toSocket].sockfd, messageToSend, strlen(messageToSend));
+
+						if(n < 0)
+							printf("Error: writing to socket!!!\n");
+
+						printf("write to %d\n", link_socket[toSocket].sockfd);
+
+						// End: Temporary change to send message to bridge
 
 						// TODO should we send the packet to both bridge that a host connects or one of them?
 						/*n = write(which_bridge_to_use, w_buffer, strlen(w_buffer));

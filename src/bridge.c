@@ -16,10 +16,44 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include "ether.h"
+
+#define MAXHOSTS 32
 /*----------------------------------------------------------------*/
 
 char mLanName[100];
 int mNumPorts;
+
+int learningCounter;
+
+typedef struct macSocket{
+	MacAddr mac;
+	int socket;
+} MACSKT;
+
+MACSKT learningTable[MAXHOSTS];
+
+
+void pushToLearning(MacAddr mac, int socket) {
+	int i;
+	for(i=0;i<learningCounter;i++){
+		if(strcmp(learningTable[i].mac, mac) == 0)
+			return;
+	}
+
+	strcpy(learningTable[learningCounter].mac, mac);
+	learningTable[learningCounter].socket = socket;
+	learningCounter++;
+}
+
+int getSocketFromLearning(char *mac) {
+	int i;
+	for (i = 0; i < learningCounter; i++) {
+		if (strcmp(learningTable[i].mac, mac) == 0)
+			return i;
+	}
+	return -1;
+}
 
 /* bridge : recvs pkts and relays them */
 /* usage: bridge lan-name max-port */
@@ -60,7 +94,7 @@ int main(int argc, char *argv[]) {
 
 	bridgeSockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (bridgeSockfd < 0)
-		printf("ERROR opening socket!");
+		printf("ERROR opening sockechart!");
 
 	bzero((char *) &serv_addr, sizeof(serv_addr));
 
@@ -140,7 +174,6 @@ int main(int argc, char *argv[]) {
 				perror("accept");
 				exit(EXIT_FAILURE);
 			}
-
 			// new client information
 			printf("bridge: connect from at \'%d\'\n", ntohs(cli_addr.sin_port));
 			clCounter++;
@@ -196,11 +229,18 @@ int main(int argc, char *argv[]) {
 				// Forward the message that came in
 				else {
 					//set the string terminating NULL byte on the end of the data read
+					printf("Message Received\n");
 					buffer[msglen] = '\0';
-					getpeername(sd, (struct sockaddr*) &cli_addr,
-							(socklen_t*) &clilen);
-					printf("%d: %s", ntohs(cli_addr.sin_port), buffer);
-					// TODO forward message according to switch table
+					printf("%s\n", buffer);
+
+					// TODO push information to the learning table
+					// INFO frame will contain the mac address of its source
+					// INFO lookup for interface name for that mac address
+					// INFO and add it to the link_socket table
+
+					// CALL pushToLearning(MacAddr macAddress, int socket i.e. sd here)
+
+					// TODO forward message according to larning table
 					//send(where_to_send, buffer, strlen(buffer), 0);
 				}
 			}
