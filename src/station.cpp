@@ -289,10 +289,12 @@ void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 	byte frame[BUFSIZ];
 	ByteIO byteIO(frame, sizeof(frame));
 	short type = 1; //IP frame
+	int pkt_size = sizeof(pkt);
 	byteIO.WriteUInt16(type);
-	byteIO.WriteUInt16(sizeof(pkt));
+	byteIO.WriteUInt16(pkt_size);
 	byteIO.WriteArray(srcAddr, 6);
 	byteIO.WriteArray(dstAddr, 6);
+	byteIO.WriteArray(pkt, pkt_size);
 
 	int sendSize = sizeof(frame) - byteIO.GetAvailable();
 	int ret = send(sock, frame, sendSize, 0);
@@ -350,6 +352,27 @@ void procInputMsg(char *data) {
 	} else {
 
 	}
+}
+
+void procRevMsg(char *data, int size) {
+	//extract Frame
+	ByteIO byteIO((byte *) data, size);
+	MacAddr srcAddr, dstAddr;
+	int type = byteIO.ReadUInt16(); //0: arp, 1: ip
+	int pkt_size = byteIO.ReadUInt16(); //ip packet size
+	char *pkt = new char[pkt_size];
+	byteIO.ReadArray(srcAddr, 6);
+	byteIO.ReadArray(dstAddr, 6);
+	byteIO.ReadArray(pkt, pkt_size);
+
+	//extract IP
+	char msg[BUFSIZ];
+	ByteIO byteIO(pkt, pkt_size);
+	int data_len = byteIO.ReadUInt16();
+	IPAddr srcIP = byteIO.ReadUInt32();
+	IPAddr dstIP = byteIO.ReadUInt32();
+	byteIO.ReadArray(msg, data_len);
+	msg[data_len] = 0;
 }
 
 void station() {
@@ -437,8 +460,7 @@ void station() {
 				} else {
 					buf[n] = 0;
 
-					//get msg
-
+					procRevMsg(buf, n);
 				}
 			}
 			itv++;
@@ -465,7 +487,8 @@ int main(int argc, char *argv[]) {
 
 	/* initialization of hosts, interface, and routing tables */
 	if (argc < 5) {
-		printf("Please provide with specified format: ./station -no interface routing_table hostname\n");
+		printf(
+				"Please provide with specified format: ./station -no interface routing_table hostname\n");
 		return 0;
 	}
 
