@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include "util.h"
 #include "ether.h"
 
 #define MAXHOSTS 32
@@ -34,21 +35,21 @@ typedef struct macSocket {
 MACSKT learningTable[MAXHOSTS];
 
 void pushToLearning(MacAddr mac, int socket) {
-	int i;
+	int i, j, c;
 	for (i = 0; i < learningCounter; i++) {
-		if (strcmp(learningTable[i].mac, mac) == 0)
+		if(compareMac(learningTable[i].mac, mac)==0)
 			return;
 	}
 
-	strcpy(learningTable[learningCounter].mac, mac);
+	memcpy(learningTable[learningCounter].mac, mac, 6);
 	learningTable[learningCounter].socket = socket;
 	learningCounter++;
 }
 
-int getSocketFromLearning(char *mac) {
+int getSocketFromLearning(MacAddr mac) {
 	int i;
 	for (i = 0; i < learningCounter; i++) {
-		if (strcmp(learningTable[i].mac, mac) == 0)
+		if (compareMac(learningTable[i].mac, mac) == 0)
 			return i;
 	}
 	return -1;

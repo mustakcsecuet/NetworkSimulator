@@ -85,13 +85,13 @@ void readFromInterface() {
 		iface_list[intr_cnt].ipaddr = inet_addr(res[1].c_str());
 		iface_list[intr_cnt].mask = inet_addr(res[2].c_str());
 
-		/*vector<string> splits = split(res[3], ':');
+		vector<string> splits = split(res[3], ':');
 		for (int i = 0; i < (int) splits.size(); i++) {
 			iface_list[intr_cnt].macaddr[i] = strtol(splits[i].c_str(), NULL,
 					16);
-		}*/
+		}
 
-		strcpy(iface_list[intr_cnt].macaddr,res[3].c_str());
+		//strcpy(iface_list[intr_cnt].macaddr,res[3].c_str());
 
 		strcpy(iface_list[intr_cnt].lanname, res[4].c_str());
 
@@ -254,7 +254,7 @@ void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 	int toIntf = getInterface(rtabl.destsubnet);
 
 	MacAddr destMac;
-	strcpy(destMac, iface_list[toIntf].macaddr);
+	memcpy(destMac, iface_list[toIntf].macaddr, 6);
 
 	int toSocket = getSocket(iface_list[toIntf].lanname);
 
@@ -272,8 +272,8 @@ void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 	int pkt_size = sizeof(pkt);
 	byteIO.WriteUInt16(type);
 	byteIO.WriteUInt16(pkt_size);
-	byteIO.WriteArray(srcAddr, 20);
-	byteIO.WriteArray(dstAddr, 20);
+	byteIO.WriteArray(srcAddr, 6);
+	byteIO.WriteArray(dstAddr, 6);
 	byteIO.WriteArray(pkt, pkt_size);
 
 	int sendSize = sizeof(frame) - byteIO.GetAvailable();
