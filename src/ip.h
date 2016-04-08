@@ -11,7 +11,9 @@
 #define PROT_TYPE_TCP 1
 #define PROT_TYPE_OSPF 2
 
-typedef unsigned long IPAddr;
+#define BUFSIZ 1024
+
+typedef unsigned int IPAddr;
 
 /* Structure to represent an interface */
 

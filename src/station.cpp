@@ -21,6 +21,16 @@ int isSameNetwork(IPAddr destSubnet, IPAddr mask, IPAddr checkIP) {
 	return 0;
 }
 
+int getSocket(char *lanName) {
+	int i;
+	for (i = 0; i < iface_links.size(); i++) {
+		if (strcmp(iface_links[i].ifacename, lanName) == 0)
+			return i;
+	}
+
+	return -1;
+}
+
 void readFromHosts() {
 	FILE *fp;
 	char *line = NULL;
@@ -28,13 +38,13 @@ void readFromHosts() {
 	ssize_t read;
 	char *ch;
 	int counter = 0;
-	host_cnt = 0;
+	hostcnt = 0;
 
 	fp = fopen(hostFile, "r");
 
 	if (fp == NULL) {
 		perror("Error while opening the host file.\n");
-		exit (EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 
 	while ((read = getline(&line, &len, fp)) != -1) {
@@ -42,13 +52,13 @@ void readFromHosts() {
 		while (ch != NULL) {
 			counter++;
 			if (counter % 2 != 0) {
-				strcpy(host[host_cnt].name, ch);
+				strcpy(host[hostcnt].name, ch);
 			} else {
-				host[host_cnt].addr = inet_addr(ch);
+				host[hostcnt].addr = inet_addr(ch);
 			}
 			ch = strtok(NULL, "\n");
 			if (counter % 2 == 0)
-				host_cnt++;
+				hostcnt++;
 		}
 	}
 	fclose(fp);
@@ -56,7 +66,7 @@ void readFromHosts() {
 
 int getHost(char *hostName) {
 	int i;
-	for (i = 0; i < host_cnt; i++) {
+	for (i = 0; i < hostcnt; i++) {
 		if (strcmp(host[i].name, hostName) == 0)
 			return i;
 	}
@@ -66,40 +76,33 @@ int getHost(char *hostName) {
 void readFromInterface() {
 	ifstream ifs(ifsFile);
 	string line;
-	iface_cnt = 0;
+	intr_cnt = 0;
 	while (std::getline(ifs, line, '\n')) {
 		if (line.length() < 1)
 			continue;
-		vector < string > res = split(line, '\t');
-		strcpy(iface_list[iface_cnt].ifacename, res[0].c_str());
-		iface_list[iface_cnt].ipaddr = inet_addr(res[1].c_str());
-		iface_list[iface_cnt].mask = inet_addr(res[2].c_str());
+		vector<string> res = split(line, '\t');
+		strcpy(iface_list[intr_cnt].ifacename, res[0].c_str());
+		iface_list[intr_cnt].ipaddr = inet_addr(res[1].c_str());
+		iface_list[intr_cnt].mask = inet_addr(res[2].c_str());
 
-		vector < string > splits = split(res[3], ':');
+		vector<string> splits = split(res[3], ':');
 		for (int i = 0; i < (int) splits.size(); i++) {
-			iface_list[iface_cnt].macaddr[i] = strtol(splits[i].c_str(), NULL,
+			iface_list[intr_cnt].macaddr[i] = strtol(splits[i].c_str(), NULL,
 					16);
 		}
-		strcpy(iface_list[iface_cnt].lanname, res[4].c_str());
 
-		iface_cnt++;
+		//strcpy(iface_list[intr_cnt].macaddr,res[3].c_str());
+
+		strcpy(iface_list[intr_cnt].lanname, res[4].c_str());
+
+		intr_cnt++;
 	}
 	ifs.close();
-	/*
-	 for (int i = 0; i < iface_cnt; i++) {
-	 printf(
-	 "name: %s; IP: %ld; Mask: %ld; Mac: %02x:%02x:%02x:%02x:%02x:%02x; Lan %s\n",
-	 iface_list[i].ifacename, iface_list[i].ipaddr,
-	 iface_list[i].mask, iface_list[i].macaddr[0],
-	 iface_list[i].macaddr[1], iface_list[i].macaddr[2],
-	 iface_list[i].macaddr[3], iface_list[i].macaddr[4],
-	 iface_list[i].macaddr[5], iface_list[i].lanname);
-	 }*/
 }
 
 int getInterface(IPAddr destIP) {
 	int i;
-	for (i = 0; i < iface_cnt; i++) {
+	for (i = 0; i < intr_cnt; i++) {
 		if (isSameNetwork(destIP, iface_list[i].mask, iface_list[i].ipaddr)
 				== 1)
 			return i;
@@ -114,13 +117,13 @@ void readFromRouting() {
 	ssize_t read;
 	char *ch;
 	int counter = 0;
-	rtable_cnt = 0;
+	rt_cnt = 0;
 
 	fp = fopen(rouFile, "r");
 
 	if (fp == NULL) {
 		perror("Error while opening the host file.\n");
-		exit (EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 
 	while ((read = getline(&line, &len, fp)) != -1) {
@@ -128,35 +131,29 @@ void readFromRouting() {
 		while (ch != NULL) {
 			counter++;
 			if (counter % 4 == 1)
-				rt_table[rtable_cnt].destsubnet = inet_addr(ch);
+				rt_table[rt_cnt].destsubnet = inet_addr(ch);
 			else if (counter % 4 == 2)
-				rt_table[rtable_cnt].nexthop = inet_addr(ch);
+				rt_table[rt_cnt].nexthop = inet_addr(ch);
 			else if (counter % 4 == 3)
-				rt_table[rtable_cnt].mask = inet_addr(ch);
+				rt_table[rt_cnt].mask = inet_addr(ch);
 			else if (counter % 4 == 0) {
 				ch[strlen(ch) - 1] = 0;  //remove '\n'
-				strcpy(rt_table[rtable_cnt].ifacename, ch);
+				strcpy(rt_table[rt_cnt].ifacename, ch);
 			}
 			if (counter % 4 == 0) {
 				ch = strtok(NULL, "\n");
-				rtable_cnt++;
+				rt_cnt++;
 			} else {
 				ch = strtok(NULL, "\t");
 			}
 		}
 	}
 	fclose(fp);
-	/*
-	 for (int i = 0; i < rt_cnt; i++) {
-	 printf("Dest: %ld; Next: %ld; Mask: %ld; Name %s\n",
-	 rt_table[i].destsubnet, rt_table[i].nexthop, rt_table[i].mask,
-	 rt_table[i].ifacename);
-	 }*/
 }
 
 int getRouting(IPAddr hostIP) {
 	int i;
-	for (i = 0; i < rtable_cnt; i++) {
+	for (i = 0; i < rt_cnt; i++) {
 		if (isSameNetwork(rt_table[i].destsubnet, rt_table[i].mask, hostIP)
 				== 1)
 			return i;
@@ -164,18 +161,19 @@ int getRouting(IPAddr hostIP) {
 	return -1;
 }
 
-int connBridge(char *ip, int port) {
-	int sockfd;
-	int ioflags, n, error;
-	fd_set rset, wset;
-	socklen_t len;
+int connBridge(int pos, char *ip, int port) {
+	int servSocket = -1;
 	struct sockaddr_in serv_addr;
 
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0)
-		return (-1);
-	ioflags = fcntl(sockfd, F_GETFL, 0);
-	fcntl(sockfd, F_SETFL, ioflags | O_NONBLOCK);
+	char r_buffer[1024];
+	char w_buffer[1024];
+
+	int counterTime = 0;
+	int i, n;
+
+	servSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if (servSocket < 0)
+		printf("ERROR opening socket");
 
 	// server configuration
 	bzero((char *) &serv_addr, sizeof(serv_addr));
@@ -183,67 +181,42 @@ int connBridge(char *ip, int port) {
 	inet_aton(ip, (struct in_addr *) &serv_addr.sin_addr.s_addr);
 	serv_addr.sin_port = port;
 
-	if ((n = connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)))
-			< 0) {
-		if (errno != EINPROGRESS) {
-			close(sockfd);
-			return (-1);
+	printf("Try to connect: %s %d\n", ip, port);
+
+	while (counterTime < 6) {
+		// connect to server
+		if (connect(servSocket, (struct sockaddr *) &serv_addr,
+				sizeof(serv_addr)) < 0)
+			printf("ERROR connecting");
+
+		printf("%s %d\n", ip, port);
+
+		sleep(2);
+		// Add this portion to only check if connection succeed or rejected
+
+		bzero(r_buffer, 1024);
+		n = read(servSocket, r_buffer, 1024);
+		if (n < 0) {
+			printf("ERROR reading from socket");
+		} else if (n == 0) {
+			break;
+			printf("Disconnected from bridge\n");
 		}
-	}
-	if (n == 0)
-		return (sockfd);
 
-	// cannot establish the connection immediately
-	FD_ZERO(&rset);
-	FD_SET(sockfd, &rset);
-	wset = rset;
-
-	select(sockfd + 1, &rset, &wset, NULL, NULL);
-	// should check signal interrupt
-	error = 0;
-	if (FD_ISSET(sockfd, &rset) || FD_ISSET(sockfd, &wset)) {
-		len = sizeof(error);
-		if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
-			close(sockfd);
-			return (-1);
+		if (strcmp("accept", r_buffer) == 0) {
+			ITF2LINK link;
+			link.sockfd = servSocket;
+			strcpy(link.ifacename, iface_list[pos].lanname);
+			iface_links.push_back(link);
+			break;
+		} else {
+			printf(">> %s", r_buffer);
+			break;
 		}
-	}
 
-	if (error) {
-		close(sockfd);
-		return (-1);
+		counterTime++;
 	}
-
-	//restore properties
-	fcntl(sockfd, F_SETFL, ioflags);
-	return (sockfd);
-}
-
-int get_accept_msg(int sockfd) {
-	int wait = 2;
-	int times = 5;
-	char buf[BUFSIZ];
-	int n, ioflags;
-	//ioflags = fcntl(sockfd, F_GETFL, 0);
-	//fcntl(sockfd, F_SETFL, ioflags | O_NONBLOCK);
-
-	n = read(sockfd, buf, BUFSIZ);
-	if (n <= 0) {
-		if (n == 0)
-			cout << "connection closed" << endl;
-		else
-			perror("something wrong ");
-		close(sockfd);
-		return -1;
-	}
-	buf[n] = 0;
-	if (strcmp(buf, "accept") == 0)
-		return sockfd;
-	else if (strcmp(buf, "reject") == 0) {
-		close(sockfd);
-		return -1;
-	}
-	return -1;
+	return servSocket;
 }
 
 int getIfaceSock(char *ifacen) {
@@ -262,8 +235,8 @@ int getIfaceSock(char *ifacen) {
  */
 byte* msgToIPpkt(char *data, Host srcHost, Host dstHost) {
 	short data_len = strlen(data);
-	byte *packet = new byte[10 + data_len];
-	ByteIO byteIO(packet, sizeof(packet));
+	byte *packet = new byte[10+data_len];
+	ByteIO byteIO(packet, 10+data_len);
 	byteIO.WriteUInt16(data_len);
 	byteIO.WriteUInt32(srcHost.addr);
 	byteIO.WriteUInt32(dstHost.addr);
@@ -278,7 +251,14 @@ byte* msgToIPpkt(char *data, Host srcHost, Host dstHost) {
  */
 void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 		Host srcHost, Host dstHost) {
-	int sock = getIfaceSock(rtabl.ifacename);
+	int toIntf = getInterface(rtabl.destsubnet);
+
+	MacAddr destMac;
+	memcpy(destMac, iface_list[toIntf].macaddr, 6);
+
+	int toSocket = getSocket(iface_list[toIntf].lanname);
+
+	int sock = iface_links[toSocket].sockfd;
 	if (sock < 0) {
 		cout << rtabl.ifacename << " is not connected!" << endl;
 		return;
@@ -289,7 +269,9 @@ void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 	byte frame[BUFSIZ];
 	ByteIO byteIO(frame, sizeof(frame));
 	short type = 1; //IP frame
-	int pkt_size = sizeof(pkt);
+	int pkt_size = 10 + strlen(data);
+
+	cout << "pkt_size: " << pkt_size << endl;
 	byteIO.WriteUInt16(type);
 	byteIO.WriteUInt16(pkt_size);
 	byteIO.WriteArray(srcAddr, 6);
@@ -297,6 +279,7 @@ void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 	byteIO.WriteArray(pkt, pkt_size);
 
 	int sendSize = sizeof(frame) - byteIO.GetAvailable();
+	cout << "frame size: " << sendSize << endl;
 	int ret = send(sock, frame, sendSize, 0);
 	if (ret < 0) {
 		cerr << "Failed to send frame: " << sock << endl;
@@ -316,15 +299,17 @@ void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 void procInputMsg(char *data) {
 	data = remove_whitespace(data);
 	if (strncmp(data, "send", 4) == 0) {
-		char *p = data + 5;
-		int i = 0;
-		while (*(p + i) && !isspace(*(p + i)))
-			i++;
-		//host name
-		char hostname[60];
-		strncpy(hostname, p, i - 1);
-		//real data
-		p = p + i + 1;
+		string msg(data);
+
+		size_t pos = msg.find(" ");
+		string where = msg.substr(pos + 1, 1);
+		string what = msg.substr(pos + 3);
+
+		char hostname[100];
+		char message[100];
+
+		strcpy(hostname, where.c_str());
+		strcpy(message, what.c_str());
 
 		//get dst Host
 		int pi = getHost(hostname);
@@ -348,7 +333,7 @@ void procInputMsg(char *data) {
 		Host srcHost = host[pi];
 
 		MacAddr srcAddr, dstAddr;
-		sendInputMsg(p, dstRtabl, srcAddr, dstAddr, srcHost, dstHost);
+		sendInputMsg(message, dstRtabl, srcAddr, dstAddr, srcHost, dstHost);
 	} else {
 
 	}
@@ -356,22 +341,22 @@ void procInputMsg(char *data) {
 
 void procRevMsg(char *data, int size) {
 	//extract Frame
-	ByteIO byteIO((byte *) data, size);
+	ByteIO frame((byte *) data, size);
 	MacAddr srcAddr, dstAddr;
-	int type = byteIO.ReadUInt16(); //0: arp, 1: ip
-	int pkt_size = byteIO.ReadUInt16(); //ip packet size
+	int type = frame.ReadUInt16(); //0: arp, 1: ip
+	int pkt_size = frame.ReadUInt16(); //ip packet size
 	char *pkt = new char[pkt_size];
-	byteIO.ReadArray(srcAddr, 6);
-	byteIO.ReadArray(dstAddr, 6);
-	byteIO.ReadArray(pkt, pkt_size);
+	frame.ReadArray(srcAddr, 6);
+	frame.ReadArray(dstAddr, 6);
+	frame.ReadArray(pkt, pkt_size);
 
 	//extract IP
 	char msg[BUFSIZ];
-	ByteIO byteIO(pkt, pkt_size);
-	int data_len = byteIO.ReadUInt16();
-	IPAddr srcIP = byteIO.ReadUInt32();
-	IPAddr dstIP = byteIO.ReadUInt32();
-	byteIO.ReadArray(msg, data_len);
+	ByteIO ipPacket((byte *) pkt, pkt_size);
+	int data_len = ipPacket.ReadUInt16();
+	IPAddr srcIP = ipPacket.ReadUInt32();
+	IPAddr dstIP = ipPacket.ReadUInt32();
+	ipPacket.ReadArray(msg, data_len);
 	msg[data_len] = 0;
 }
 
@@ -382,17 +367,18 @@ void station() {
 	int max_fd = -1;
 	FD_ZERO(&all_set);
 
-	for (i = 0; i < iface_cnt; i++) {
+	printf("%d\n", intr_cnt);
+	for (i = 0; i < intr_cnt; i++) {
 		char *name = iface_list[i].lanname;
 
 		char ip[100] = ".";
 		strcat(ip, name);
-		ip[strlen(ip) - 1] = '\0';
+		ip[strlen(ip)] = '\0';
 		strcat(ip, ".addr");
 
 		char port[100] = ".";
 		strcat(port, name);
-		port[strlen(port) - 1] = '\0';
+		port[strlen(port)] = '\0';
 		strcat(port, ".port");
 
 		char ipAddr[1024];
@@ -408,18 +394,12 @@ void station() {
 		cout << iface_list[i].ifacename << " try to connecto to bridge " << name
 				<< "..." << endl;
 		// connect to server
-		int sockfd = connBridge(ipAddr, portno);
-		sockfd = get_accept_msg(sockfd);
+		int sockfd = connBridge(i, ipAddr, portno);
 
 		if (sockfd > 0) {
 			cout << "connection accepted!" << endl;
 			FD_SET(sockfd, &all_set);
 			max_fd = max(max_fd, sockfd);
-
-			ITF2LINK link;
-			link.sockfd = sockfd;
-			strcpy(link.ifacename, iface_list[i].ifacename);
-			iface_links.push_back(link);
 		} else
 			cout << "connection rejected!" << endl;
 	}

@@ -1,25 +1,44 @@
 /*----------------------------------------------------------------*/
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <malloc.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <signal.h>
-#include <sys/wait.h>
-#include <errno.h>
-#include <string.h>
-#include <netdb.h>
-#include <arpa/inet.h>
+#include "ip.h"
+#include "head.h"
+#include "util.h"
+#include "ByteIO.h"
 
-#include <stdlib.h>
-#include <unistd.h>
+#define MAXHOSTS 32
 /*----------------------------------------------------------------*/
 
 char mLanName[100];
 int mNumPorts;
+
+int learningCounter;
+
+typedef struct macSocket {
+	MacAddr mac;
+	int socket;
+} MACSKT;
+
+MACSKT learningTable[MAXHOSTS];
+
+void pushToLearning(MacAddr mac, int socket) {
+	int i, j, c;
+	for (i = 0; i < learningCounter; i++) {
+		if (compareMac(learningTable[i].mac, mac) == 0)
+			return;
+	}
+
+	memcpy(learningTable[learningCounter].mac, mac, 6);
+	learningTable[learningCounter].socket = socket;
+	learningCounter++;
+}
+
+int getSocketFromLearning(MacAddr mac) {
+	int i;
+	for (i = 0; i < learningCounter; i++) {
+		if (compareMac(learningTable[i].mac, mac) == 0)
+			return i;
+	}
+	return -1;
+}
 
 /* bridge : recvs pkts and relays them */
 /* usage: bridge lan-name max-port */
@@ -29,7 +48,6 @@ int main(int argc, char *argv[]) {
 
 	struct sockaddr_in serv_addr, cli_addr;
 	socklen_t clilen;
-	struct hostent *name;
 
 	char bridgeIP[100];
 	int bridgePortNo;
@@ -38,7 +56,7 @@ int main(int argc, char *argv[]) {
 	int max_sd, sd, clCounter;
 
 	int activity, msglen;
-	int i, j;
+	int i;
 	char welcome_msg[200];
 	char buffer[1024];
 
@@ -61,7 +79,7 @@ int main(int argc, char *argv[]) {
 
 	bridgeSockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (bridgeSockfd < 0)
-		printf("ERROR opening socket!");
+		printf("ERROR opening sockechart!");
 
 	bzero((char *) &serv_addr, sizeof(serv_addr));
 
@@ -139,9 +157,8 @@ int main(int argc, char *argv[]) {
 			if ((newConnectionSockfd = accept(bridgeSockfd,
 					(struct sockaddr *) &cli_addr, (socklen_t*) &clilen)) < 0) {
 				perror("accept");
-				exit(EXIT_FAILURE);
+				exit (EXIT_FAILURE);
 			}
-
 			// new client information
 			printf("bridge: connect from at \'%d\'\n",
 					ntohs(cli_addr.sin_port));
@@ -149,7 +166,7 @@ int main(int argc, char *argv[]) {
 
 			if (clCounter <= mNumPorts) {
 				// send successful connection greeting message
-				sprintf(welcome_msg, "success");
+				sprintf(welcome_msg, "accept");
 				if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg),
 						0) != strlen(welcome_msg)) {
 					printf("send");
@@ -198,9 +215,61 @@ int main(int argc, char *argv[]) {
 				// Forward the message that came in
 				else {
 					//set the string terminating NULL byte on the end of the data read
-					buffer[msglen] = '\0';
-					printf("%d: %s", ntohs(cli_addr.sin_port), buffer);
-					// TODO forward message according to switch table
+					printf("Message Received, len: %d\n", msglen);
+
+					ByteIO frame((byte *) buffer, msglen);
+					MacAddr srcAddr, dstAddr;
+					int type = frame.ReadUInt16(); //0: arp, 1: ip
+					int pkt_size = frame.ReadUInt16(); //ip packet size
+					cout << "type: " << type << ", pkt_size: " << pkt_size << endl;
+					char *pkt = new char[pkt_size];
+					frame.ReadArray(srcAddr, 6);
+					frame.ReadArray(dstAddr, 6);
+					frame.ReadArray(pkt, pkt_size);
+
+					//extract IP
+					char msg[BUFSIZ];
+					ByteIO ipPacket((byte *) pkt, pkt_size);
+					int data_len = ipPacket.ReadUInt16();
+					IPAddr srcIP = ipPacket.ReadUInt32();
+					IPAddr dstIP = ipPacket.ReadUInt32();
+					ipPacket.ReadArray(msg, data_len);
+					msg[data_len] = 0;
+					cout << srcIP << ", " << dstIP << ", " << msg << endl;
+					msg[data_len] = 0;
+					delete[] pkt;
+
+					// TODO push information to the learning table
+					// INFO frame will contain the mac address of its source
+					// INFO lookup for interface name for that mac address
+					// INFO and add it to the link_socket table
+
+					// CALL pushToLearning(MacAddr macAddress, int socket i.e. sd here)
+
+					// TODO forward message according to larningg table
+					// INFO first look for the learning table if we already
+					// INFO know which socket to forward
+					// INFO if socket informaiton is not in learning table
+					// INFO broadcast to all socket except the socket sd
+
+					// CALL getSocketFromLearning(MacAddr mac)
+					/*
+					 * int toSocket = getSocketFromLearning(destMac);
+					 */
+					// TODO If find in learning table, send to specific socket
+					// TODO else send it to all available socket except sd
+					/*
+					 * if(toSocket != -1){
+					 * 	send(learningTable[toSocket].socket, buffer, strlen(buffer), 0);
+					 * } else {
+					 *  int j;
+					 * 	for(j=0;j<mNumPorts;j++){
+					 * 	    if(sd != client_socket[j])
+					 * 		  send(client_socket[j], buffer, strlen(buffer), 0);
+					 * 	}
+					 * }
+					 */
+
 					//send(where_to_send, buffer, strlen(buffer), 0);
 				}
 			}

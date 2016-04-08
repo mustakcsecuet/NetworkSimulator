@@ -10,6 +10,7 @@
 
 
 #include "head.h"
+#include "ether.h"
 
 using namespace std;
 
@@ -86,6 +87,18 @@ char* remove_whitespace(char *buffer) {
 	while (*buffer && isspace(*buffer))
 		buffer++;
 	return buffer;
+}
+
+int compareMac(MacAddr first, MacAddr second) {
+	int i, c;
+	c = 0;
+	for (i = 0; i < 6; i++) {
+		if (first[i] == second[i])
+			c++;
+	}
+	if (c == 6)
+		return 0;
+	return 1;
 }
 
 #endif /* UTIL_H_ */
