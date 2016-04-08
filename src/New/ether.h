@@ -5,7 +5,7 @@
 #define TYPE_IP_PKT 1
 #define TYPE_ARP_PKT 0
 
-typedef unsigned char MacAddr[20];
+typedef char MacAddr[20];
 
 /* structure of an ethernet pkt */
 typedef struct __etherpkt 
