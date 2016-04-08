@@ -218,14 +218,15 @@ int main(int argc, char *argv[]) {
 					printf("Message Received, len: %d\n", msglen);
 
 					ByteIO frame((byte *) buffer, msglen);
-					MacAddr srcAddr, dstAddr;
+					MacAddr srcMac, dstMac;
 					int type = frame.ReadUInt16(); //0: arp, 1: ip
 					int pkt_size = frame.ReadUInt16(); //ip packet size
 					cout << "type: " << type << ", pkt_size: " << pkt_size << endl;
 					char *pkt = new char[pkt_size];
-					frame.ReadArray(srcAddr, 6);
-					frame.ReadArray(dstAddr, 6);
+					frame.ReadArray(srcMac, 6);
+					frame.ReadArray(dstMac, 6);
 					frame.ReadArray(pkt, pkt_size);
+					printf("srcMac: %02x:%02x:%02x:%02x:%02x:%02x\n", srcMac[0], srcMac[1], srcMac[2], srcMac[3], srcMac[4], srcMac[5]);
 
 					//extract IP
 					char msg[BUFSIZ];

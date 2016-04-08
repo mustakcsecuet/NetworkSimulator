@@ -21,16 +21,6 @@ int isSameNetwork(IPAddr destSubnet, IPAddr mask, IPAddr checkIP) {
 	return 0;
 }
 
-int getSocket(char *lanName) {
-	int i;
-	for (i = 0; i < iface_links.size(); i++) {
-		if (strcmp(iface_links[i].ifacename, lanName) == 0)
-			return i;
-	}
-
-	return -1;
-}
-
 void readFromHosts() {
 	FILE *fp;
 	char *line = NULL;
@@ -44,7 +34,7 @@ void readFromHosts() {
 
 	if (fp == NULL) {
 		perror("Error while opening the host file.\n");
-		exit(EXIT_FAILURE);
+		exit (EXIT_FAILURE);
 	}
 
 	while ((read = getline(&line, &len, fp)) != -1) {
@@ -80,18 +70,16 @@ void readFromInterface() {
 	while (std::getline(ifs, line, '\n')) {
 		if (line.length() < 1)
 			continue;
-		vector<string> res = split(line, '\t');
+		vector < string > res = split(line, '\t');
 		strcpy(iface_list[intr_cnt].ifacename, res[0].c_str());
 		iface_list[intr_cnt].ipaddr = inet_addr(res[1].c_str());
 		iface_list[intr_cnt].mask = inet_addr(res[2].c_str());
 
-		vector<string> splits = split(res[3], ':');
+		vector < string > splits = split(res[3], ':');
 		for (int i = 0; i < (int) splits.size(); i++) {
 			iface_list[intr_cnt].macaddr[i] = strtol(splits[i].c_str(), NULL,
 					16);
 		}
-
-		//strcpy(iface_list[intr_cnt].macaddr,res[3].c_str());
 
 		strcpy(iface_list[intr_cnt].lanname, res[4].c_str());
 
@@ -100,11 +88,20 @@ void readFromInterface() {
 	ifs.close();
 }
 
-int getInterface(IPAddr destIP) {
+int getIfaceByIP(IPAddr destIP) {
 	int i;
 	for (i = 0; i < intr_cnt; i++) {
 		if (isSameNetwork(destIP, iface_list[i].mask, iface_list[i].ipaddr)
 				== 1)
+			return i;
+	}
+	return -1;
+}
+
+int getIfaceByName(char *ifname) {
+	int i;
+	for (i = 0; i < intr_cnt; i++) {
+		if (strcmp(iface_list[i].ifacename, ifname) == 0)
 			return i;
 	}
 	return -1;
@@ -123,7 +120,7 @@ void readFromRouting() {
 
 	if (fp == NULL) {
 		perror("Error while opening the host file.\n");
-		exit(EXIT_FAILURE);
+		exit (EXIT_FAILURE);
 	}
 
 	while ((read = getline(&line, &len, fp)) != -1) {
@@ -206,7 +203,8 @@ int connBridge(int pos, char *ip, int port) {
 		if (strcmp("accept", r_buffer) == 0) {
 			ITF2LINK link;
 			link.sockfd = servSocket;
-			strcpy(link.ifacename, iface_list[pos].lanname);
+			strcpy(link.ifacename, iface_list[pos].ifacename);
+			cout << "sockfd: " << servSocket << ", " << link.ifacename << endl;
 			iface_links.push_back(link);
 			break;
 		} else {
@@ -235,8 +233,8 @@ int getIfaceSock(char *ifacen) {
  */
 byte* msgToIPpkt(char *data, Host srcHost, Host dstHost) {
 	short data_len = strlen(data);
-	byte *packet = new byte[10+data_len];
-	ByteIO byteIO(packet, 10+data_len);
+	byte *packet = new byte[10 + data_len];
+	ByteIO byteIO(packet, 10 + data_len);
 	byteIO.WriteUInt16(data_len);
 	byteIO.WriteUInt32(srcHost.addr);
 	byteIO.WriteUInt32(dstHost.addr);
@@ -249,20 +247,16 @@ byte* msgToIPpkt(char *data, Host srcHost, Host dstHost) {
  *  frame format:
  *  type[0-1]size[2-3]srcAddr[4-9]dstAddr[10-15]IPpacket...
  */
-void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
-		Host srcHost, Host dstHost) {
-	int toIntf = getInterface(rtabl.destsubnet);
+void sendInputMsg(char *data, Rtable rtabl, MacAddr srcMac, Host srcHost,
+		Host dstHost) {
+	MacAddr dstMac;
 
-	MacAddr destMac;
-	memcpy(destMac, iface_list[toIntf].macaddr, 6);
-
-	int toSocket = getSocket(iface_list[toIntf].lanname);
-
-	int sock = iface_links[toSocket].sockfd;
+	int sock = getIfaceSock(rtabl.ifacename);
 	if (sock < 0) {
 		cout << rtabl.ifacename << " is not connected!" << endl;
 		return;
 	}
+	cout << "get sock: " << sock << ", " << rtabl.ifacename << endl;
 
 	byte* pkt = msgToIPpkt(data, srcHost, dstHost);
 
@@ -274,8 +268,8 @@ void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 	cout << "pkt_size: " << pkt_size << endl;
 	byteIO.WriteUInt16(type);
 	byteIO.WriteUInt16(pkt_size);
-	byteIO.WriteArray(srcAddr, 6);
-	byteIO.WriteArray(dstAddr, 6);
+	byteIO.WriteArray(srcMac, 6);
+	byteIO.WriteArray(dstMac, 6);
 	byteIO.WriteArray(pkt, pkt_size);
 
 	int sendSize = sizeof(frame) - byteIO.GetAvailable();
@@ -326,14 +320,14 @@ void procInputMsg(char *data) {
 		}
 		Rtable dstRtabl = rt_table[pi];
 
-		//get MAC address, not done, Arp
-
 		//get src Host
 		pi = getHost(dstRtabl.ifacename);
 		Host srcHost = host[pi];
 
-		MacAddr srcAddr, dstAddr;
-		sendInputMsg(message, dstRtabl, srcAddr, dstAddr, srcHost, dstHost);
+		MacAddr srcMac;
+		int srcFacePos = getIfaceByName(dstRtabl.ifacename);
+		memcpy(srcMac, iface_list[srcFacePos].macaddr, 6);
+		sendInputMsg(message, dstRtabl, srcMac, srcHost, dstHost);
 	} else {
 
 	}
