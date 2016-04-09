@@ -10,6 +10,8 @@ char ifsFile[100];
 char rouFile[100];
 char hostFile[100];
 
+char saveMessage[100];
+
 vector<ITF2LINK> iface_links;
 vector<IP_PKT> ip_pkts;
 
@@ -370,6 +372,7 @@ void sendInputMsg(char *data, Rtable rtabl, IPAddr srcIP, IPAddr dstIP,
  */
 void procInputMsg(char *data) {
 	data = remove_whitespace(data);
+	strcpy(saveMessage, data);
 	if (strncmp(data, "send", 4) == 0) {
 		string msg(data);
 
@@ -420,13 +423,15 @@ void procInputMsg(char *data) {
 			printf("I know the destination mac\n");
 			memcpy(dstAddr, arpCacheList[arpPointer].macaddr, 6);
 			type = 0;
+			sendInputMsg(message, dstRtabl, srcAddr, dstAddr, srcHost, dstHost,
+					type);
 		} else {
 			setEmpty(dstAddr);
 			type = 1;
+			char request[] = "request";
+			sendInputMsg(request, dstRtabl, srcAddr, dstAddr, srcHost, dstHost,
+							type);
 		}
-
-		sendInputMsg(message, dstRtabl, srcAddr, dstAddr, srcHost, dstHost,
-				type);
 	} else {
 
 	}
@@ -482,6 +487,7 @@ void procRevMsg(char *data, int size) {
 		reply(dstIP, srcIP, srcAddr);
 	} else if(type == 2) {
 		storeInArpCache(srcIP, srcAddr);
+		procInputMsg(saveMessage);
 	}
 }
 
