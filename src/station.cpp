@@ -496,19 +496,21 @@ void procRevMsg(char *data, int size) {
 	IPAddr dstIP = ipPacket.ReadUInt32();
 	ipPacket.ReadArray(msg, data_len);
 	msg[data_len] = 0;
-	cout << srcIP << ", " << dstIP << ", " << msg << endl;
+	cout << srcIP << ", " << dstIP << endl;
 	msg[data_len] = 0;
 	delete[] pkt;
 
-	if (isMyMac(dstAddr) == 1) {
-
-	} else if (isMyIP(dstIP) == 1) {
+	if (isMyIP(dstIP) == 1) {
 		if (type == 1) {
 			storeInArpCache(srcIP, srcAddr);
 			reply(dstIP, srcIP, srcAddr);
 		} else if (type == 2) {
 			storeInArpCache(srcIP, srcAddr);
 			procInputMsg(saveMessage);
+		} else if (type == 0) {
+			if (isMyMac(dstAddr) == 1) {
+				cout << "Received: " << msg << endl;
+			}
 		}
 	}
 }
