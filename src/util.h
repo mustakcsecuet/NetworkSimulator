@@ -102,8 +102,33 @@ void setEmpty(MacAddr temp) {
 	int i;
 
 	for (i = 0; i < 6; i++) {
-		temp[i]=0;
+		temp[i] = 0;
 	}
+}
+
+void printIP(char *msg, IPAddr ip) {
+	int i;
+	struct in_addr ip_addr;
+    ip_addr.s_addr = ip;
+    printf("%s : %s\n", msg, inet_ntoa(ip_addr));
+}
+
+void printMac(char *msg, MacAddr mac) {
+	int i;
+	printf("%s :", msg);
+	for (i = 0; i < 6; i++)
+		printf("%02x", mac[i]);
+	printf("\n");
+}
+
+void printInformation(IPAddr srcIP, IPAddr dstIP, MacAddr srcMac,
+		MacAddr dstMac) {
+	printf("Information:\n");
+
+	printIP((char*)"Source IP", srcIP);
+	printIP((char*)"Destination IP", dstIP);
+	printMac((char*)"Source Mac", srcMac);
+	printMac((char*)"Dsetnation Mac", dstMac);
 }
 
 #endif /* UTIL_H_ */

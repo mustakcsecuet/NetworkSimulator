@@ -85,8 +85,7 @@ typedef struct p_queue
 {
   IPAddr next_hop_ipaddr;
   IPAddr dst_ipaddr;
-  char *pending_pkt;
-  struct p_queue *next;
+  char msg[BUFSIZ];
   
 } PENDING_QUEUE;
 

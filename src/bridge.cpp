@@ -20,7 +20,6 @@ typedef struct macSocket {
 MACSKT learningTable[MAXHOSTS];
 
 void pushToLearning(MacAddr mac, int socket) {
-	printf("from push\n");
 	int i, j, c;
 	for (i = 0; i < learningCounter; i++) {
 		if (compareMac(learningTable[i].mac, mac) == 0)
@@ -33,7 +32,6 @@ void pushToLearning(MacAddr mac, int socket) {
 }
 
 int getSocketFromLearning(MacAddr mac) {
-	printf("from get\n");
 	int i;
 	for (i = 0; i < learningCounter; i++) {
 		if (compareMac(learningTable[i].mac, mac) == 0)
@@ -223,8 +221,8 @@ int main(int argc, char *argv[]) {
 					MacAddr srcAddr, dstAddr;
 					int type = frame.ReadUInt16(); //0: arp, 1: ip
 					int pkt_size = frame.ReadUInt16(); //ip packet size
-					cout << "type: " << type << ", pkt_size: " << pkt_size
-							<< endl;
+					/*cout << "type: " << type << ", pkt_size: " << pkt_size
+							<< endl;*/
 					char *pkt = new char[pkt_size];
 					frame.ReadArray(srcAddr, 6);
 					frame.ReadArray(dstAddr, 6);
@@ -238,7 +236,7 @@ int main(int argc, char *argv[]) {
 					IPAddr dstIP = ipPacket.ReadUInt32();
 					ipPacket.ReadArray(msg, data_len);
 					msg[data_len] = 0;
-					cout << srcIP << ", " << dstIP << ", " << msg << endl;
+					//cout << srcIP << ", " << dstIP << ", " << msg << endl;
 					msg[data_len] = 0;
 					delete[] pkt;
 
@@ -248,9 +246,6 @@ int main(int argc, char *argv[]) {
 					// INFO and add it to the link_socket table
 
 					// CALL pushToLearning(MacAddr macAddress, int socket i.e. sd here)
-					printf("Mac: %02x:%02x:%02x:%02x:%02x:%02x\n", srcAddr[0],
-							srcAddr[1], srcAddr[2], srcAddr[3], srcAddr[4],
-							srcAddr[5]);
 					pushToLearning(srcAddr, sd);
 
 					// TODO forward message according to larningg table
@@ -267,11 +262,11 @@ int main(int argc, char *argv[]) {
 					// TODO else send it to all available socket except sd
 
 					if (toSocket != -1) {
-						printf("found in learning table\n");
+						printf("Found in learning table\n");
 						send(learningTable[toSocket].socket, buffer,
 								msglen, 0);
 					} else {
-						printf("not found in learning table\n");
+						printf("Not found in learning table\n");
 						int j;
 						for (j = 0; j < mNumPorts; j++) {
 							if (sd != client_socket[j])
