@@ -15,6 +15,24 @@ char saveMessage[100];
 vector<ITF2LINK> iface_links;
 vector<IP_PKT> ip_pkts;
 
+int isMyIP(IPAddr ip) {
+	int i;
+	for (i = 0; i < intr_cnt; i++) {
+		if (iface_list[i].ipaddr == ip)
+			return 1;
+	}
+	return 0;
+}
+
+int isMyMac(MacAddr mac) {
+	int i;
+	for (i = 0; i < intr_cnt; i++) {
+		if (compareMac(iface_list[i].macaddr, mac) == 0)
+			return 1;
+	}
+	return 0;
+}
+
 int doWeKnowMac(IPAddr destIP) {
 	int i;
 	for (i = 0; i < arp_cache_counter; i++) {
@@ -430,7 +448,7 @@ void procInputMsg(char *data) {
 			type = 1;
 			char request[] = "request";
 			sendInputMsg(request, dstRtabl, srcAddr, dstAddr, srcHost, dstHost,
-							type);
+					type);
 		}
 	} else {
 
@@ -482,12 +500,16 @@ void procRevMsg(char *data, int size) {
 	msg[data_len] = 0;
 	delete[] pkt;
 
-	if (type == 1) {
-		storeInArpCache(srcIP, srcAddr);
-		reply(dstIP, srcIP, srcAddr);
-	} else if(type == 2) {
-		storeInArpCache(srcIP, srcAddr);
-		procInputMsg(saveMessage);
+	if (isMyMac(dstAddr) == 1) {
+
+	} else if (isMyIP(dstIP) == 1) {
+		if (type == 1) {
+			storeInArpCache(srcIP, srcAddr);
+			reply(dstIP, srcIP, srcAddr);
+		} else if (type == 2) {
+			storeInArpCache(srcIP, srcAddr);
+			procInputMsg(saveMessage);
+		}
 	}
 }
 
