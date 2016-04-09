@@ -310,7 +310,7 @@ byte* msgToIPpkt(char *data, IPAddr srcIP, IPAddr dstIP) {
  */
 void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 		Host srcHost, Host dstHost, int type) {
-	int toIntf = getInterface(rtabl.destsubnet);
+	int toIntf = getIfaceByName(rtabl.ifacename);
 
 	int toSocket = getSocket(iface_list[toIntf].lanname);
 
@@ -344,7 +344,7 @@ void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 
 void sendInputMsg(char *data, Rtable rtabl, IPAddr srcIP, IPAddr dstIP,
 		MacAddr srcAddr, MacAddr dstAddr, int type) {
-	int toIntf = getInterface(rtabl.destsubnet);
+	int toIntf = getIfaceByName(rtabl.ifacename);
 
 	MacAddr destMac;
 	memcpy(destMac, iface_list[toIntf].macaddr, 6);
@@ -421,6 +421,7 @@ void procInputMsg(char *data) {
 			return;
 		}
 		Rtable dstRtabl = rt_table[pi];
+		printf("Router Information: %s %d %d\n", dstRtabl.ifacename, dstRtabl.destsubnet, dstRtabl.nexthop);
 
 		//get MAC address, not done, Arp
 		int toIntf = getIfaceByName(dstRtabl.ifacename);
@@ -488,7 +489,7 @@ void procRevMsg(char *data, int size) {
 	frame.ReadArray(dstAddr, 6);
 	frame.ReadArray(pkt, pkt_size);
 
-//extract IP
+	//extract IP
 	char msg[BUFSIZ];
 	ByteIO ipPacket((byte *) pkt, pkt_size);
 	int data_len = ipPacket.ReadUInt16();
@@ -515,7 +516,134 @@ void procRevMsg(char *data, int size) {
 	}
 }
 
+void procRouterRevMsg(char *data, int size) {
+
+	ByteIO frame((byte *) data, size);
+	MacAddr srcAddr, dstAddr;
+	int type = frame.ReadUInt16(); //0: arp, 1: ip
+	int pkt_size = frame.ReadUInt16(); //ip packet size
+	cout << "type: " << type << ", pkt_size: " << pkt_size << endl;
+	char *pkt = new char[pkt_size];
+	frame.ReadArray(srcAddr, 6);
+	frame.ReadArray(dstAddr, 6);
+	frame.ReadArray(pkt, pkt_size);
+
+	//extract IP
+	char msg[BUFSIZ];
+	ByteIO ipPacket((byte *) pkt, pkt_size);
+	int data_len = ipPacket.ReadUInt16();
+	IPAddr srcIP = ipPacket.ReadUInt32();
+	IPAddr dstIP = ipPacket.ReadUInt32();
+	ipPacket.ReadArray(msg, data_len);
+	msg[data_len] = 0;
+	cout << srcIP << ", " << dstIP << endl;
+	msg[data_len] = 0;
+	delete[] pkt;
+
+	if (type == 1) {
+		storeInArpCache(srcIP, srcAddr);
+		//forward the packet
+		//reply(dstIP, srcIP, srcAddr);
+	} else if (type == 2) {
+		storeInArpCache(srcIP, srcAddr);
+		//forward the packet
+		//procInputMsg(saveMessage);
+	} else if (type == 0) {
+		//froward the packet
+	}
+}
+
 void station() {
+	int i, n;
+	char buf[BUFSIZ];
+	fd_set r_set, all_set;
+	int max_fd = -1;
+	FD_ZERO(&all_set);
+
+	printf("%d\n", intr_cnt);
+	for (i = 0; i < intr_cnt; i++) {
+		char *name = iface_list[i].lanname;
+
+		char ip[100] = ".";
+		strcat(ip, name);
+		ip[strlen(ip)] = '\0';
+		strcat(ip, ".addr");
+
+		char port[100] = ".";
+		strcat(port, name);
+		port[strlen(port)] = '\0';
+		strcat(port, ".port");
+
+		char ipAddr[1024];
+		size_t len;
+		if ((len = readlink(ip, ipAddr, sizeof(ipAddr) - 1)) != -1)
+			ipAddr[len] = '\0';
+
+		char portNo[1024];
+		if ((len = readlink(port, portNo, sizeof(portNo) - 1)) != -1)
+			portNo[len] = '\0';
+		int portno = htons(atoi(portNo));
+
+		cout << iface_list[i].ifacename << " try to connecto to bridge " << name
+				<< "..." << endl;
+		// connect to server
+		int sockfd = connBridge(i, ipAddr, portno);
+
+		if (sockfd > 0) {
+			cout << "connection accepted!" << endl;
+			cout<<"My Socket: "<<sockfd<<endl;
+			FD_SET(sockfd, &all_set);
+			max_fd = max(max_fd, sockfd);
+		} else
+			cout << "connection rejected!" << endl;
+	}
+
+	// set stdin to nonblocking mode
+	int in_fd = fileno(stdin);
+	int flag = fcntl(in_fd, F_GETFL, 0);
+	fcntl(in_fd, F_SETFL, flag | O_NONBLOCK);
+	FD_SET(in_fd, &all_set);
+	max_fd = max(in_fd, max_fd);
+
+	string line;
+	for (;;) {
+		r_set = all_set;
+		select(max_fd + 1, &r_set, NULL, NULL, NULL);
+
+		if (FD_ISSET(in_fd, &r_set)) {
+			//input from user
+			getline(cin, line);
+			strcpy(buf, line.c_str());
+			procInputMsg(buf);
+		}
+
+		vector<ITF2LINK>::iterator itv = iface_links.begin();
+		while (itv != iface_links.end()) {
+			int tmp_fd = (*itv).sockfd;
+			if (FD_ISSET(tmp_fd, &r_set)) {
+				n = read(tmp_fd, buf, BUFSIZ);
+				if (n <= 0) {
+					//bridge exit
+					close(tmp_fd);
+					FD_CLR(tmp_fd, &all_set);
+
+					cout << "iface: " << (*itv).ifacename << " disconnected!"
+							<< endl;
+					itv = iface_links.erase(itv);
+					continue;
+				} else {
+					buf[n] = 0;
+
+					procRevMsg(buf, n);
+				}
+			}
+			itv++;
+		}
+	}
+}
+
+void router() {
+
 	int i, n;
 	char buf[BUFSIZ];
 	fd_set r_set, all_set;
@@ -573,9 +701,9 @@ void station() {
 
 		if (FD_ISSET(in_fd, &r_set)) {
 			//input from user
-			getline(cin, line);
-			strcpy(buf, line.c_str());
-			procInputMsg(buf);
+			/*getline(cin, line);
+			 strcpy(buf, line.c_str());
+			 procRouterInputMsg(buf);*/
 		}
 
 		vector<ITF2LINK>::iterator itv = iface_links.begin();
@@ -595,15 +723,12 @@ void station() {
 				} else {
 					buf[n] = 0;
 
-					procRevMsg(buf, n);
+					procRouterRevMsg(buf, n);
 				}
 			}
 			itv++;
 		}
 	}
-}
-
-void router() {
 
 }
 
