@@ -127,6 +127,15 @@ int getHost(char *hostName) {
 	return -1;
 }
 
+int getHostByIP(IPAddr ip) {
+	int i;
+	for (i = 0; i < hostcnt; i++) {
+		if (host[i].addr == ip)
+			return i;
+	}
+	return -1;
+}
+
 void readFromInterface() {
 	ifstream ifs(ifsFile);
 	string line;
@@ -431,10 +440,10 @@ void procInputMsg(char *data) {
 			PENDING_QUEUE item;
 			item.dst_ipaddr = dstHost.addr;
 			item.next_hop_ipaddr = nextHop;
-			strcpy(item.msg,data);
+			strcpy(item.msg, data);
 			pkt_que.push_back(item);
 
-			setEmpty (dstMac);
+			setEmpty(dstMac);
 			type = 1;
 			char request[] = "request";
 			printf("ARP request\n");
@@ -537,23 +546,31 @@ void procRouterRevMsg(char *data, int size) {
 	msg[data_len] = 0;
 	delete[] pkt;
 
-	int toRouter = getRouting(dstIP);
-	Rtable dsRtable = rt_table[toRouter];
-	printf("Next Hop: %s\n", dsRtable.ifacename);
+	printf("Message Received: \n");
+	printInformation(srcIP, dstIP, srcAddr, dstAddr);
 
-	int toIntf = getIfaceByName(dsRtable.ifacename);
-	Iface intFace = iface_list[toIntf];
-
-	if (type == 1) {
-		storeInArpCache(srcIP, srcAddr);
-		//forward the packet
-		//reply(intFace.ipaddr, srcIP, intFace.macaddr);
-	} else if (type == 2) {
-		storeInArpCache(srcIP, srcAddr);
-		//forward the packet
-		//procInputMsg(saveMessage);
-	} else if (type == 0) {
-		//froward the packet
+	if (isMyIP(dstIP) == 1) {
+		if (type == 1) {
+			storeInArpCache(srcIP, srcAddr);
+			printf("ARP reply\n");
+			reply(dstIP, srcIP, srcAddr);
+		} else if (type == 2) {
+			storeInArpCache(srcIP, srcAddr);
+			// Retrieve original packet from queue
+			int queID = getPendingPacket(srcIP);
+			PENDING_QUEUE pending = pkt_que[queID];
+			printf("Store the data %s\n", pending.msg);
+			procInputMsg(pending.msg);
+		}
+	} else {
+		if (isMyMac(dstAddr) == 1 && type == 0) {
+			int toWho = getHostByIP(dstIP);
+			char temp[100] = "send ";
+			strcat(temp, host[toWho].name);
+			strcat(temp, " ");
+			strcat(temp, msg);
+			procInputMsg(temp);
+		}
 	}
 }
 
