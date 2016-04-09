@@ -11,7 +11,9 @@
 #define PROT_TYPE_TCP 1
 #define PROT_TYPE_OSPF 2
 
-typedef unsigned long IPAddr;
+#define BUFSIZ 1024
+
+typedef unsigned int IPAddr;
 
 /* Structure to represent an interface */
 
@@ -56,11 +58,6 @@ typedef struct arpcache {
 /* Structure for ARP packets */
 
 /*list of arp cache, to use this one to maintain current cache*/
-
-typedef struct arp_list {
-  Arpc *arp_item;
-  struct arp_list *next;
-} ARP_LIST;
 
 /*ARP packet format*/
 typedef struct arp_pkt 
@@ -133,8 +130,10 @@ int intr_cnt; /* counter for interface */
 Rtable rt_table[MAXHOSTS*MAXINTER];
 int rt_cnt;
 
+Arpc arpCacheList[MAXHOSTS];
+int arp_cache_counter;
+
 PENDING_QUEUE *pending_queue;
-ARP_LIST *arp_cache;
 
 int ROUTER;
 
