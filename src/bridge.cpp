@@ -198,12 +198,10 @@ int main(int argc, char *argv[]) {
 
 			if (FD_ISSET(sd, &readfds)) {
 				// Check if it was for closing , and also read the incoming message
-				if ((msglen = read(sd, buffer, 1024)) == 0) {
+				if ((msglen = read(sd, buffer, 1024)) <= 0) {
 					// Somebody disconnected , get his details and print
-					getpeername(sd, (struct sockaddr*) &cli_addr,
-							(socklen_t*) &clilen);
-					printf("bridge: disconnect at %d\'\n",
-							ntohs(cli_addr.sin_port));
+					//getpeername(sd, (struct sockaddr*) &cli_addr, (socklen_t*) &clilen);
+					cout << "host on port " << i << " disconnected" << endl;
 
 					// Close the socket and mark as 0 in list for reuse
 					close(sd);

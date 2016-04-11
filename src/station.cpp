@@ -34,7 +34,7 @@ int isMyMac(MacAddr mac) {
 
 int getPendingPacket(IPAddr checkIP) {
 	int i;
-	for (i = 0; i < (int)iface_links.size(); i++) {
+	for (i = 0; i < (int) iface_links.size(); i++) {
 		if (pkt_que[i].next_hop_ipaddr == checkIP)
 			return i;
 	}
@@ -77,7 +77,7 @@ int isSameNetwork(IPAddr destSubnet, IPAddr mask, IPAddr checkIP) {
 
 int getSocket(char *lanName) {
 	int i;
-	for (i = 0; i < (int)iface_links.size(); i++) {
+	for (i = 0; i < (int) iface_links.size(); i++) {
 		if (strcmp(iface_links[i].ifacename, lanName) == 0)
 			return i;
 	}
@@ -583,6 +583,15 @@ void prompt(string name) {
 	cout << name << ">";
 }
 
+void clean() {
+	vector<ITF2LINK>::iterator itv = iface_links.begin();
+	while (itv != iface_links.end()) {
+		int tmp_fd = (*itv).sockfd;
+		close(tmp_fd);
+	}
+	iface_links.clear();
+}
+
 void station() {
 	int i, n;
 	char buf[BUFSIZ];
@@ -606,11 +615,11 @@ void station() {
 
 		char ipAddr[1024];
 		size_t len;
-		if ((int)(len = readlink(ip, ipAddr, sizeof(ipAddr) - 1)) != -1)
+		if ((int) (len = readlink(ip, ipAddr, sizeof(ipAddr) - 1)) != -1)
 			ipAddr[len] = '\0';
 
 		char portNo[1024];
-		if ((int)(len = readlink(port, portNo, sizeof(portNo) - 1)) != -1)
+		if ((int) (len = readlink(port, portNo, sizeof(portNo) - 1)) != -1)
 			portNo[len] = '\0';
 		int portno = htons(atoi(portNo));
 
@@ -638,8 +647,6 @@ void station() {
 	FD_SET(in_fd, &all_set);
 	max_fd = max(in_fd, max_fd);
 
-	prompt("STATION");
-
 	string line;
 	for (;;) {
 		r_set = all_set;
@@ -650,6 +657,13 @@ void station() {
 			//input from user
 			getline(cin, line);
 			strcpy(buf, line.c_str());
+
+			/* quit the station */
+			if (strncmp(buf, "quit", 4) == 0) {
+				clean();
+				break;
+			}
+
 			procInputMsg(buf);
 		}
 
@@ -702,11 +716,11 @@ void router() {
 
 		char ipAddr[1024];
 		size_t len;
-		if ((int)(len = readlink(ip, ipAddr, sizeof(ipAddr) - 1)) != -1)
+		if ((int) (len = readlink(ip, ipAddr, sizeof(ipAddr) - 1)) != -1)
 			ipAddr[len] = '\0';
 
 		char portNo[1024];
-		if ((int)(len = readlink(port, portNo, sizeof(portNo) - 1)) != -1)
+		if ((int) (len = readlink(port, portNo, sizeof(portNo) - 1)) != -1)
 			portNo[len] = '\0';
 		int portno = htons(atoi(portNo));
 
@@ -733,7 +747,6 @@ void router() {
 	FD_SET(in_fd, &all_set);
 	max_fd = max(in_fd, max_fd);
 
-	prompt("ROUTER");
 	string line;
 	for (;;) {
 		r_set = all_set;
@@ -743,6 +756,11 @@ void router() {
 			//input from user
 			prompt("ROUTER");
 			getline(cin, line);
+			/* quit the router */
+			if (strncmp(buf, "quit", 4) == 0) {
+				clean();
+				break;
+			}
 			strcpy(buf, line.c_str());
 			//procRouterInputMsg(buf);
 		}
