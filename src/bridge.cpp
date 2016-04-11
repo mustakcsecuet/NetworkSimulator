@@ -105,6 +105,7 @@ int main(int argc, char *argv[]) {
 	 * so that others (stations/routers) can connect to it
 	 */
 
+
 	char linkIPName[100] = ".";
 	strcat(linkIPName, mLanName);
 	strcat(linkIPName, ".addr");
@@ -165,8 +166,8 @@ int main(int argc, char *argv[]) {
 				// send successful connection greeting message
 				sprintf(welcome_msg, "accept");
 				if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg),
-						0) != strlen(welcome_msg)) {
-					printf("send");
+						0) != 6) {
+					perror("send");
 				}
 
 				// add new socket to array of sockets
@@ -182,7 +183,7 @@ int main(int argc, char *argv[]) {
 				// send reject connection message
 				sprintf(welcome_msg, "reject");
 				if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg),
-						0) != strlen(welcome_msg)) {
+						0) != 6) {
 					perror("send");
 				}
 				close(newConnectionSockfd);
@@ -217,7 +218,7 @@ int main(int argc, char *argv[]) {
 
 					ByteIO frame((byte *) buffer, msglen);
 					MacAddr srcAddr, dstAddr;
-					int type = frame.ReadUInt16(); //0: arp, 1: ip
+					frame.ReadUInt16(); //type 0: arp, 1: ip
 					int pkt_size = frame.ReadUInt16(); //ip packet size
 					/*cout << "type: " << type << ", pkt_size: " << pkt_size
 							<< endl;*/
@@ -230,8 +231,8 @@ int main(int argc, char *argv[]) {
 					char msg[BUFSIZ];
 					ByteIO ipPacket((byte *) pkt, pkt_size);
 					int data_len = ipPacket.ReadUInt16();
-					IPAddr srcIP = ipPacket.ReadUInt32();
-					IPAddr dstIP = ipPacket.ReadUInt32();
+					ipPacket.ReadUInt32();  //srcIP
+					ipPacket.ReadUInt32(); //dstIP
 					ipPacket.ReadArray(msg, data_len);
 					msg[data_len] = 0;
 					//cout << srcIP << ", " << dstIP << ", " << msg << endl;

@@ -34,7 +34,7 @@ int isMyMac(MacAddr mac) {
 
 int getPendingPacket(IPAddr checkIP) {
 	int i;
-	for (i = 0; i < iface_links.size(); i++) {
+	for (i = 0; i < (int)iface_links.size(); i++) {
 		if (pkt_que[i].next_hop_ipaddr == checkIP)
 			return i;
 	}
@@ -77,7 +77,7 @@ int isSameNetwork(IPAddr destSubnet, IPAddr mask, IPAddr checkIP) {
 
 int getSocket(char *lanName) {
 	int i;
-	for (i = 0; i < iface_links.size(); i++) {
+	for (i = 0; i < (int)iface_links.size(); i++) {
 		if (strcmp(iface_links[i].ifacename, lanName) == 0)
 			return i;
 	}
@@ -99,7 +99,7 @@ void readFromHosts() {
 
 	if (fp == NULL) {
 		perror("Error while opening the host file.\n");
-		exit(EXIT_FAILURE);
+		exit (EXIT_FAILURE);
 	}
 
 	while ((read = getline(&line, &len, fp)) != -1) {
@@ -148,12 +148,12 @@ void readFromInterface() {
 		if (line.length() < 1)
 			continue;
 		cout << line;
-		vector<string> res = split(line, '\t');
+		vector < string > res = split(line, '\t');
 		strcpy(iface_list[intr_cnt].ifacename, res[0].c_str());
 		iface_list[intr_cnt].ipaddr = inet_addr(res[1].c_str());
 		iface_list[intr_cnt].mask = inet_addr(res[2].c_str());
 
-		vector<string> splits = split(res[3], ':');
+		vector < string > splits = split(res[3], ':');
 		for (int i = 0; i < (int) splits.size(); i++) {
 			iface_list[intr_cnt].macaddr[i] = strtol(splits[i].c_str(), NULL,
 					16);
@@ -199,7 +199,7 @@ void readFromRouting() {
 
 	if (fp == NULL) {
 		perror("Error while opening the host file.\n");
-		exit(EXIT_FAILURE);
+		exit (EXIT_FAILURE);
 	}
 
 	while ((read = getline(&line, &len, fp)) != -1) {
@@ -244,10 +244,9 @@ int connBridge(int pos, char *ip, int port) {
 	struct sockaddr_in serv_addr;
 
 	char r_buffer[1024];
-	char w_buffer[1024];
 
 	int counterTime = 0;
-	int i, n;
+	int n;
 
 	servSocket = socket(AF_INET, SOCK_STREAM, 0);
 	if (servSocket < 0)
@@ -259,16 +258,13 @@ int connBridge(int pos, char *ip, int port) {
 	inet_aton(ip, (struct in_addr *) &serv_addr.sin_addr.s_addr);
 	serv_addr.sin_port = port;
 
-	//printf("Try to connect: %s %d\n", ip, port);
-
 	while (counterTime < 6) {
 		// connect to server
 		if (connect(servSocket, (struct sockaddr *) &serv_addr,
 				sizeof(serv_addr)) < 0)
-			printf("ERROR connecting");
+			perror("connect to serv");
 
-		//printf("%s %d\n", ip, port);
-
+		cout << "no responce.." << endl;
 		sleep(2);
 		// Add this portion to only check if connection succeed or rejected
 
@@ -277,8 +273,8 @@ int connBridge(int pos, char *ip, int port) {
 		if (n < 0) {
 			printf("ERROR reading from socket");
 		} else if (n == 0) {
-			break;
 			printf("Disconnected from bridge\n");
+			break;
 		}
 
 		if (strcmp("accept", r_buffer) == 0) {
@@ -288,7 +284,7 @@ int connBridge(int pos, char *ip, int port) {
 			iface_links.push_back(link);
 			break;
 		} else {
-			printf(">> %s", r_buffer);
+			printf("get msg: %s!", r_buffer);
 			break;
 		}
 
@@ -583,6 +579,10 @@ void procRouterRevMsg(char *data, int size) {
 	}
 }
 
+void prompt(string name) {
+	cout << name << ">";
+}
+
 void station() {
 	int i, n;
 	char buf[BUFSIZ];
@@ -606,15 +606,18 @@ void station() {
 
 		char ipAddr[1024];
 		size_t len;
-		if ((len = readlink(ip, ipAddr, sizeof(ipAddr) - 1)) != -1)
+		if ((int)(len = readlink(ip, ipAddr, sizeof(ipAddr) - 1)) != -1)
 			ipAddr[len] = '\0';
 
 		char portNo[1024];
-		if ((len = readlink(port, portNo, sizeof(portNo) - 1)) != -1)
+		if ((int)(len = readlink(port, portNo, sizeof(portNo) - 1)) != -1)
 			portNo[len] = '\0';
 		int portno = htons(atoi(portNo));
 
 		// connect to server
+		cout << name << " " << ipAddr << " " << portNo << endl;
+		cout << "iface " << i << " try to connect to bridge " << name
+				<< "...\n";
 		int sockfd = connBridge(i, ipAddr, portno);
 
 		if (sockfd > 0) {
@@ -625,6 +628,8 @@ void station() {
 			cout << "connection rejected!" << endl;
 	}
 
+	cout << endl;
+
 	// set stdin to nonblocking mode
 	int in_fd = fileno(stdin);
 	int flag = fcntl(in_fd, F_GETFL, 0);
@@ -632,12 +637,14 @@ void station() {
 	FD_SET(in_fd, &all_set);
 	max_fd = max(in_fd, max_fd);
 
+
 	string line;
 	for (;;) {
 		r_set = all_set;
 		select(max_fd + 1, &r_set, NULL, NULL, NULL);
 
 		if (FD_ISSET(in_fd, &r_set)) {
+			prompt("STATION");
 			//input from user
 			getline(cin, line);
 			strcpy(buf, line.c_str());
@@ -693,15 +700,18 @@ void router() {
 
 		char ipAddr[1024];
 		size_t len;
-		if ((len = readlink(ip, ipAddr, sizeof(ipAddr) - 1)) != -1)
+		if ((int)(len = readlink(ip, ipAddr, sizeof(ipAddr) - 1)) != -1)
 			ipAddr[len] = '\0';
 
 		char portNo[1024];
-		if ((len = readlink(port, portNo, sizeof(portNo) - 1)) != -1)
+		if ((int)(len = readlink(port, portNo, sizeof(portNo) - 1)) != -1)
 			portNo[len] = '\0';
 		int portno = htons(atoi(portNo));
 
 		// connect to server
+		cout << name << " " << ipAddr << " " << portNo << endl;
+		cout << "iface " << i << " try to connect to bridge " << name
+				<< "...\n";
 		int sockfd = connBridge(i, ipAddr, portno);
 
 		if (sockfd > 0) {
@@ -711,6 +721,8 @@ void router() {
 		} else
 			cout << "connection rejected!" << endl;
 	}
+
+	cout << endl;
 
 	// set stdin to nonblocking mode
 	int in_fd = fileno(stdin);
@@ -726,9 +738,9 @@ void router() {
 
 		if (FD_ISSET(in_fd, &r_set)) {
 			//input from user
-			/*getline(cin, line);
-			 strcpy(buf, line.c_str());
-			 procRouterInputMsg(buf);*/
+			getline(cin, line);
+			strcpy(buf, line.c_str());
+			//procRouterInputMsg(buf);
 		}
 
 		vector<ITF2LINK>::iterator itv = iface_links.begin();
@@ -761,15 +773,6 @@ void router() {
 /* station : gets hooked to all the lans in its ifaces file, sends/recvs pkts */
 /* usage: station <-no -route> interface routingtable hostname */
 int main(int argc, char *argv[]) {
-	int portno, n;
-	struct sockaddr_in serv_addr;
-
-	pid_t pid;
-	int sts;
-
-	char r_buffer[1024];
-	char w_buffer[1024];
-
 	arp_cache_counter = 0;
 
 	/* initialization of hosts, interface, and routing tables */
