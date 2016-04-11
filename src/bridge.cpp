@@ -20,7 +20,7 @@ typedef struct macSocket {
 MACSKT learningTable[MAXHOSTS];
 
 void pushToLearning(MacAddr mac, int socket) {
-	int i, j, c;
+	int i;
 	for (i = 0; i < learningCounter; i++) {
 		if (compareMac(learningTable[i].mac, mac) == 0)
 			return;
@@ -61,8 +61,7 @@ int main(int argc, char *argv[]) {
 	char buffer[1024];
 
 	if (argc != 4) {
-		printf(
-				"Please provide with specified format: ./bridge lan_name num_ports\n");
+		printf("usage: bridge lan-name max-port\n");
 		return 0;
 	}
 
@@ -73,9 +72,6 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < mNumPorts; i++) {
 		client_socket[i] = 0;
 	}
-
-	/*printf("Test: lan name -> %s\n", mLanName);
-	 printf("Test: num ports -> %d\n", mNumPorts);*/
 
 	bridgeSockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (bridgeSockfd < 0)
@@ -101,6 +97,9 @@ int main(int argc, char *argv[]) {
 	socklen_t serv_len = sizeof(serv_addr);
 	getsockname(bridgeSockfd, (struct sockaddr *) &serv_addr, &serv_len);
 	bridgePortNo = ntohs(serv_addr.sin_port);
+
+	printf("Bridge created on %s:%d\n", inet_ntoa(serv_addr.sin_addr),
+				bridgePortNo);
 
 	/* create the symbolic links to its address and port number
 	 * so that others (stations/routers) can connect to it
@@ -157,11 +156,9 @@ int main(int argc, char *argv[]) {
 			if ((newConnectionSockfd = accept(bridgeSockfd,
 					(struct sockaddr *) &cli_addr, (socklen_t*) &clilen)) < 0) {
 				perror("accept");
-				exit (EXIT_FAILURE);
+				exit(EXIT_FAILURE);
 			}
 			// new client information
-			printf("bridge: connect from at \'%d\'\n",
-					ntohs(cli_addr.sin_port));
 			clCounter++;
 
 			if (clCounter <= mNumPorts) {
@@ -180,6 +177,7 @@ int main(int argc, char *argv[]) {
 						break;
 					}
 				}
+				printf("accept a new host on sockfd %d, port %d!\n", newConnectionSockfd, i);
 			} else {
 				// send reject connection message
 				sprintf(welcome_msg, "reject");
@@ -218,15 +216,15 @@ int main(int argc, char *argv[]) {
 					printf("Message Received, len: %d\n", msglen);
 
 					ByteIO frame((byte *) buffer, msglen);
-					MacAddr srcMac, dstMac;
+					MacAddr srcAddr, dstAddr;
 					int type = frame.ReadUInt16(); //0: arp, 1: ip
 					int pkt_size = frame.ReadUInt16(); //ip packet size
-					cout << "type: " << type << ", pkt_size: " << pkt_size << endl;
+					/*cout << "type: " << type << ", pkt_size: " << pkt_size
+							<< endl;*/
 					char *pkt = new char[pkt_size];
-					frame.ReadArray(srcMac, 6);
-					frame.ReadArray(dstMac, 6);
+					frame.ReadArray(srcAddr, 6);
+					frame.ReadArray(dstAddr, 6);
 					frame.ReadArray(pkt, pkt_size);
-					printf("srcMac: %02x:%02x:%02x:%02x:%02x:%02x\n", srcMac[0], srcMac[1], srcMac[2], srcMac[3], srcMac[4], srcMac[5]);
 
 					//extract IP
 					char msg[BUFSIZ];
@@ -236,7 +234,7 @@ int main(int argc, char *argv[]) {
 					IPAddr dstIP = ipPacket.ReadUInt32();
 					ipPacket.ReadArray(msg, data_len);
 					msg[data_len] = 0;
-					cout << srcIP << ", " << dstIP << ", " << msg << endl;
+					//cout << srcIP << ", " << dstIP << ", " << msg << endl;
 					msg[data_len] = 0;
 					delete[] pkt;
 
@@ -246,6 +244,7 @@ int main(int argc, char *argv[]) {
 					// INFO and add it to the link_socket table
 
 					// CALL pushToLearning(MacAddr macAddress, int socket i.e. sd here)
+					pushToLearning(srcAddr, sd);
 
 					// TODO forward message according to larningg table
 					// INFO first look for the learning table if we already
@@ -254,22 +253,25 @@ int main(int argc, char *argv[]) {
 					// INFO broadcast to all socket except the socket sd
 
 					// CALL getSocketFromLearning(MacAddr mac)
-					/*
-					 * int toSocket = getSocketFromLearning(destMac);
-					 */
+
+					int toSocket = getSocketFromLearning(dstAddr);
+
 					// TODO If find in learning table, send to specific socket
 					// TODO else send it to all available socket except sd
-					/*
-					 * if(toSocket != -1){
-					 * 	send(learningTable[toSocket].socket, buffer, strlen(buffer), 0);
-					 * } else {
-					 *  int j;
-					 * 	for(j=0;j<mNumPorts;j++){
-					 * 	    if(sd != client_socket[j])
-					 * 		  send(client_socket[j], buffer, strlen(buffer), 0);
-					 * 	}
-					 * }
-					 */
+
+					if (toSocket != -1) {
+						printf("Found in learning table\n");
+						send(learningTable[toSocket].socket, buffer,
+								msglen, 0);
+					} else {
+						printf("Not found in learning table\n");
+						int j;
+						for (j = 0; j < mNumPorts; j++) {
+							if (sd != client_socket[j])
+								send(client_socket[j], buffer, msglen,
+										0);
+						}
+					}
 
 					//send(where_to_send, buffer, strlen(buffer), 0);
 				}

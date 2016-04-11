@@ -59,11 +59,6 @@ typedef struct arpcache {
 
 /*list of arp cache, to use this one to maintain current cache*/
 
-typedef struct arp_list {
-  Arpc *arp_item;
-  struct arp_list *next;
-} ARP_LIST;
-
 /*ARP packet format*/
 typedef struct arp_pkt 
 {
@@ -90,8 +85,7 @@ typedef struct p_queue
 {
   IPAddr next_hop_ipaddr;
   IPAddr dst_ipaddr;
-  char *pending_pkt;
-  struct p_queue *next;
+  char msg[BUFSIZ];
   
 } PENDING_QUEUE;
 
@@ -135,8 +129,10 @@ int intr_cnt; /* counter for interface */
 Rtable rt_table[MAXHOSTS*MAXINTER];
 int rt_cnt;
 
+Arpc arpCacheList[MAXHOSTS];
+int arp_cache_counter;
+
 PENDING_QUEUE *pending_queue;
-ARP_LIST *arp_cache;
 
 int ROUTER;
 
