@@ -599,7 +599,6 @@ void station() {
 	int max_fd = -1;
 	FD_ZERO(&all_set);
 
-	printf("%d\n", intr_cnt);
 	for (i = 0; i < intr_cnt; i++) {
 		char *name = iface_list[i].lanname;
 
@@ -630,7 +629,7 @@ void station() {
 		int sockfd = connBridge(i, ipAddr, portno);
 
 		if (sockfd > 0) {
-			cout << "connection rejected!" << endl;
+			cout << "connection accepted!" << endl;
 			FD_SET(sockfd, &all_set);
 			max_fd = max(max_fd, sockfd);
 		} else
@@ -661,7 +660,7 @@ void station() {
 			/* quit the station */
 			if (strncmp(buf, "quit", 4) == 0) {
 				clean();
-				break;
+				exit(0);
 			}
 
 			procInputMsg(buf);
@@ -700,7 +699,6 @@ void router() {
 	int max_fd = -1;
 	FD_ZERO(&all_set);
 
-	printf("%d\n", intr_cnt);
 	for (i = 0; i < intr_cnt; i++) {
 		char *name = iface_list[i].lanname;
 
@@ -759,7 +757,7 @@ void router() {
 			/* quit the router */
 			if (strncmp(buf, "quit", 4) == 0) {
 				clean();
-				break;
+				exit(0);
 			}
 			strcpy(buf, line.c_str());
 			//procRouterInputMsg(buf);
