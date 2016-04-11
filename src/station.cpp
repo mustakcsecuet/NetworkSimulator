@@ -319,13 +319,24 @@ byte* msgToIPpkt(char *data, IPAddr srcIP, IPAddr dstIP) {
 	return packet;
 }
 
+void printIpPack(char *data, IPAddr srcIP, IPAddr dstIP) {
+	printf("IP packet is ready to send:\n");
+	cout << "*************************************" << endl;
+	cout << "		IP Packet		" << endl;
+	cout << "*************************************" << endl;
+	cout << "dstip: " << int_to_ip(dstIP) << "\t" << "srcip: "
+			<< int_to_ip(srcIP) << endl;
+	cout << "data: " << data << endl;
+	cout << "*************************************" << endl;
+	cout << endl;
+}
+
 /*
  *  frame format:
  *  type[0-1]size[2-3]srcAddr[4-9]dstAddr[10-15]IPpacket...
  */
 void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 		IPAddr srcIP, IPAddr dstIP, int type) {
-
 	// get socket information
 	int toIntf = getIfaceByName(rtabl.ifacename);
 
@@ -352,15 +363,16 @@ void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 	byteIO.WriteArray(pkt, pkt_size);
 
 	int sendSize = sizeof(frame) - byteIO.GetAvailable();
-	//cout << "frame size: " << sendSize << endl;
 
-	printInformation(srcIP, dstIP, srcAddr, dstAddr);
+	//printInformation(srcIP, dstIP, srcAddr, dstAddr);
 
 	int ret = send(sock, frame, sendSize, 0);
 	if (ret < 0) {
-		cerr << "Failed to send frame: " << sock << endl;
+		cerr << "Failed to send msg: " << sock << endl;
 	}
 	delete[] pkt;
+
+
 }
 
 /*
@@ -395,7 +407,8 @@ void procInputMsg(char *data) {
 		}
 		Host dstHost = host[pi];
 		IPAddr dstIP = dstHost.addr;
-		printIP((char*) "Destination IP", dstIP);
+		cout << "IP of " << hostname << " = " << int_to_ip(dstIP) << endl;
+		//printIP((char*) "Destination IP", dstIP);
 		// get destination ip address
 
 		// looking for next hop
@@ -413,6 +426,7 @@ void procInputMsg(char *data) {
 			nextHop = dstRtabl.nexthop;
 		}
 
+		cout << "next hop interface = " << dstRtabl.ifacename << endl;
 		printIP((char*) "Next Hop IP", nextHop);
 		// looking for next hop
 
@@ -422,6 +436,8 @@ void procInputMsg(char *data) {
 		//get source IP
 		IPAddr srcIP;
 		srcIP = iface_list[toIntf].ipaddr;
+
+		printIpPack(data, srcIP, dstIP);
 
 		// get source MAC
 		MacAddr srcMac;
@@ -435,13 +451,11 @@ void procInputMsg(char *data) {
 		int type;
 
 		if (arpPointer != -1) {
-			printf("I know the destination mac\n");
 			memcpy(dstMac, arpCacheList[arpPointer].macaddr, 6);
 			type = 0;
-			printf("Real Message\n");
 			sendInputMsg(message, dstRtabl, srcMac, dstMac, srcIP, dstIP, type);
 		} else {
-
+			cout << "MAC address not in ARP cache, put IP packet in queue" << endl;
 			PENDING_QUEUE item;
 			item.dst_ipaddr = dstHost.addr;
 			item.next_hop_ipaddr = nextHop;
@@ -451,7 +465,6 @@ void procInputMsg(char *data) {
 			setEmpty(dstMac);
 			type = 1;
 			char request[] = "request";
-			printf("ARP request\n");
 			sendInputMsg(request, dstRtabl, srcMac, dstMac, srcIP, nextHop,
 					type);
 		}
@@ -588,6 +601,7 @@ void clean() {
 	while (itv != iface_links.end()) {
 		int tmp_fd = (*itv).sockfd;
 		close(tmp_fd);
+		itv++;
 	}
 	iface_links.clear();
 }
@@ -660,7 +674,7 @@ void station() {
 			/* quit the station */
 			if (strncmp(buf, "quit", 4) == 0) {
 				clean();
-				exit(0);
+				break;
 			}
 
 			procInputMsg(buf);
@@ -757,7 +771,7 @@ void router() {
 			/* quit the router */
 			if (strncmp(buf, "quit", 4) == 0) {
 				clean();
-				exit(0);
+				break;
 			}
 			strcpy(buf, line.c_str());
 			//procRouterInputMsg(buf);
