@@ -147,7 +147,7 @@ void readFromInterface() {
 	while (std::getline(ifs, line, '\n')) {
 		if (line.length() < 1)
 			continue;
-		cout << line;
+		cout << line << endl;
 		vector < string > res = split(line, '\t');
 		strcpy(iface_list[intr_cnt].ifacename, res[0].c_str());
 		iface_list[intr_cnt].ipaddr = inet_addr(res[1].c_str());
@@ -621,11 +621,12 @@ void station() {
 		int sockfd = connBridge(i, ipAddr, portno);
 
 		if (sockfd > 0) {
-			cout << "My Socket: " << sockfd << endl;
+			cout << "connection rejected!" << endl;
 			FD_SET(sockfd, &all_set);
 			max_fd = max(max_fd, sockfd);
 		} else
 			cout << "connection rejected!" << endl;
+		cout << endl;
 	}
 
 	cout << endl;
@@ -637,6 +638,7 @@ void station() {
 	FD_SET(in_fd, &all_set);
 	max_fd = max(in_fd, max_fd);
 
+	prompt("STATION");
 
 	string line;
 	for (;;) {
@@ -731,6 +733,7 @@ void router() {
 	FD_SET(in_fd, &all_set);
 	max_fd = max(in_fd, max_fd);
 
+	prompt("ROUTER");
 	string line;
 	for (;;) {
 		r_set = all_set;
@@ -738,6 +741,7 @@ void router() {
 
 		if (FD_ISSET(in_fd, &r_set)) {
 			//input from user
+			prompt("ROUTER");
 			getline(cin, line);
 			strcpy(buf, line.c_str());
 			//procRouterInputMsg(buf);
