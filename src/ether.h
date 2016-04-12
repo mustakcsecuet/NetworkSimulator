@@ -18,8 +18,9 @@ typedef struct __etherpkt
 
   /************************************/
   /* payload type in host order       */
-  /* type = 0 : ARP frame             */
-  /* type = 1 : IP  frame             */
+  /* type = 0 : IP  frame             */
+  /* type = 1 : ARP request frame             */
+  /* type = 2 : ARP reply frame             */
   /************************************/
   short  type;
   

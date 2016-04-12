@@ -61,6 +61,7 @@ typedef   signed long long int	sint64;
 #include <signal.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <pthread.h>
 
 using namespace std;
 

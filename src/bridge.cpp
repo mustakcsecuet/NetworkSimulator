@@ -10,34 +10,110 @@
 char mLanName[100];
 int mNumPorts;
 
-int learningCounter;
-
 typedef struct macSocket {
 	MacAddr mac;
 	int socket;
+	int ttl;
+	int port;
 } MACSKT;
 
-MACSKT learningTable[MAXHOSTS];
+pthread_t timer_thread;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+int is_run = 1;
+vector<MACSKT> learningTable;
 
-void pushToLearning(MacAddr mac, int socket) {
-	int i;
-	for (i = 0; i < learningCounter; i++) {
-		if (compareMac(learningTable[i].mac, mac) == 0)
-			return;
+void pushToLearning(MacAddr mac, int socket, int port) {
+	pthread_mutex_lock(&mutex);
+	vector<MACSKT>::iterator it = learningTable.begin();
+	int old = 0;
+	while (it != learningTable.end()) {
+		MACSKT entry = *it;
+		if (compareMac(entry.mac, mac) == 0) {
+			//update timer
+			entry.ttl = timeout;
+			old = 1;
+			break;
+		}
+		it++;
 	}
-
-	memcpy(learningTable[learningCounter].mac, mac, 6);
-	learningTable[learningCounter].socket = socket;
-	learningCounter++;
+	if (!old) {
+		//insert
+		MACSKT entry;
+		memcpy(entry.mac, mac, 6);
+		entry.socket = socket;
+		entry.ttl = timeout;
+		entry.port = port;
+		learningTable.push_back(entry);
+	}
+	pthread_mutex_unlock(&mutex);
 }
 
 int getSocketFromLearning(MacAddr mac) {
-	int i;
-	for (i = 0; i < learningCounter; i++) {
-		if (compareMac(learningTable[i].mac, mac) == 0)
-			return i;
+	pthread_mutex_lock(&mutex);
+	int i, res = -1;
+	for (i = 0; i < (int) learningTable.size(); i++) {
+		if (compareMac(learningTable[i].mac, mac) == 0) {
+			res = i;
+			break;
+		}
 	}
-	return -1;
+	pthread_mutex_unlock(&mutex);
+	return res;
+
+}
+
+void *SL_timer_thread(void *arg) {
+	while (is_run) {
+		//check every second
+		sleep(interval);
+
+		pthread_mutex_lock(&mutex);
+		vector<MACSKT>::iterator it = learningTable.begin();
+		while (it != learningTable.end()) {
+			MACSKT entry = *it;
+			entry.ttl -= interval;
+
+			//remove it
+			if (entry.ttl < 1) {
+				cout << "One entry in SL table timed out:" << endl;
+				cout << "MAC address: ";
+				for (int i = 0; i < 6; i++)
+					printf("%02x", entry.mac[i]);
+				cout << "\tPort: " << entry.port << " Sockfd: " << entry.socket
+						<< "\tTTL: " << entry.ttl << endl;
+				it = learningTable.erase(it);
+				continue;
+			}
+
+			it++;
+		}
+		pthread_mutex_unlock(&mutex);
+	}
+	pthread_exit (NULL);
+}
+
+void clean() {
+	is_run = 0;
+
+	pthread_mutex_lock(&mutex);
+	learningTable.clear();
+	pthread_mutex_unlock(&mutex);
+}
+
+void show() {
+	cout << "**********************************" << endl;
+	cout << "\t\tSelf-Learning Table" << endl;
+	cout << "\t\tMAC address/port mappings" << endl;
+	cout << "**********************************" << endl;
+	for (int i = 0; i < (int) learningTable.size(); i++) {
+		MACSKT entry = learningTable[i];
+		cout << "MAC address: ";
+		for (int j = 0; j < 6; j++)
+			printf("%02x", entry.mac[j]);
+		cout << "\tPort: " << entry.port << " Sockfd: " << entry.socket
+				<< "\tTTL: " << entry.ttl << endl;
+	}
+	cout << "**********************************" << endl << endl;
 }
 
 /* bridge : recvs pkts and relays them */
@@ -99,12 +175,11 @@ int main(int argc, char *argv[]) {
 	bridgePortNo = ntohs(serv_addr.sin_port);
 
 	printf("Bridge created on %s:%d\n", inet_ntoa(serv_addr.sin_addr),
-				bridgePortNo);
+			bridgePortNo);
 
 	/* create the symbolic links to its address and port number
 	 * so that others (stations/routers) can connect to it
 	 */
-
 
 	char linkIPName[100] = ".";
 	strcat(linkIPName, mLanName);
@@ -121,8 +196,18 @@ int main(int argc, char *argv[]) {
 	clilen = sizeof(cli_addr);
 	clCounter = 0;
 
+	//timer thread
+	pthread_create(&timer_thread, NULL, SL_timer_thread, (void*) NULL);
+
 	// TODO Just copied the listen, read, send methods
 	// TODO Need to modify the codes for project specific requirements
+	// set stdin to nonblocking mode
+	int in_fd = fileno(stdin);
+	int flag = fcntl(in_fd, F_GETFL, 0);
+	fcntl(in_fd, F_SETFL, flag | O_NONBLOCK);
+
+	string line;
+	char buf[BUFSIZ];
 	while (1) {
 		// clear the socket set
 		FD_ZERO(&readfds);
@@ -130,6 +215,8 @@ int main(int argc, char *argv[]) {
 		// add master socket to set
 		FD_SET(bridgeSockfd, &readfds);
 		max_sd = bridgeSockfd;
+		FD_SET(in_fd, &readfds);
+		max_sd = max(in_fd, max_sd);
 
 		// add child sockets to set
 		for (i = 0; i < mNumPorts; i++) {
@@ -152,12 +239,30 @@ int main(int argc, char *argv[]) {
 			printf("select error");
 		}
 
+		if (FD_ISSET(in_fd, &readfds)) {
+			//input from user
+			getline(cin, line);
+			/* close the bridge */
+			if (strncmp(buf, "quit", 4) == 0) {
+				//close all connections
+				for (i = 0; i < mNumPorts; i++) {
+					if (client_socket[i] > 0)
+						close(client_socket[i]);
+				}
+				clean();
+				break;
+			}
+			strcpy(buf, line.c_str());
+			if (strncmp(buf, "show sl", 7) == 0)
+				show();
+		}
+
 		// If something happened on the master socket , then its an incoming connection
 		if (FD_ISSET(bridgeSockfd, &readfds)) {
 			if ((newConnectionSockfd = accept(bridgeSockfd,
 					(struct sockaddr *) &cli_addr, (socklen_t*) &clilen)) < 0) {
 				perror("accept");
-				exit(EXIT_FAILURE);
+				exit (EXIT_FAILURE);
 			}
 			// new client information
 			clCounter++;
@@ -178,7 +283,8 @@ int main(int argc, char *argv[]) {
 						break;
 					}
 				}
-				printf("accept a new host on sockfd %d, port %d!\n", newConnectionSockfd, i);
+				printf("accept a new host on sockfd %d, port %d!\n",
+						newConnectionSockfd, i);
 			} else {
 				// send reject connection message
 				sprintf(welcome_msg, "reject");
@@ -211,19 +317,23 @@ int main(int argc, char *argv[]) {
 
 				// Forward the message that came in
 				else {
-					//set the string terminating NULL byte on the end of the data read
-					printf("Message Received, len: %d\n", msglen);
-
 					ByteIO frame((byte *) buffer, msglen);
 					MacAddr srcAddr, dstAddr;
-					frame.ReadUInt16(); //type 0: arp, 1: ip
+					int type = frame.ReadUInt16(); //type 0: arp, 1: ip
 					int pkt_size = frame.ReadUInt16(); //ip packet size
-					/*cout << "type: " << type << ", pkt_size: " << pkt_size
-							<< endl;*/
 					char *pkt = new char[pkt_size];
 					frame.ReadArray(srcAddr, 6);
 					frame.ReadArray(dstAddr, 6);
 					frame.ReadArray(pkt, pkt_size);
+
+					cout << "received 20 bytes Ethernet Header!" << endl;
+					if (type == 1) {
+						cout << "Received " << msglen << " bytes ARP frame"
+								<< endl;
+					} else if (type == 0) {
+						cout << "Received " << msglen << " bytes IP frame"
+								<< endl;
+					}
 
 					//extract IP
 					char msg[BUFSIZ];
@@ -243,7 +353,7 @@ int main(int argc, char *argv[]) {
 					// INFO and add it to the link_socket table
 
 					// CALL pushToLearning(MacAddr macAddress, int socket i.e. sd here)
-					pushToLearning(srcAddr, sd);
+					pushToLearning(srcAddr, sd, i);
 
 					// TODO forward message according to larningg table
 					// INFO first look for the learning table if we already
@@ -259,30 +369,27 @@ int main(int argc, char *argv[]) {
 					// TODO else send it to all available socket except sd
 
 					if (toSocket != -1) {
-						printf("Found in learning table\n");
-						send(learningTable[toSocket].socket, buffer,
-								msglen, 0);
+						cout << "will send to port " << toSocket << " only"
+								<< endl;
+						send(learningTable[toSocket].socket, buffer, msglen, 0);
+						cout << "sockfd " << learningTable[toSocket].socket
+								<< ": sent " << msglen << " bytes!" << endl;
 					} else {
-						printf("Not found in learning table\n");
+						cout << "send to all ports" << endl;
 						int j;
 						for (j = 0; j < mNumPorts; j++) {
-							if (sd != client_socket[j])
-								send(client_socket[j], buffer, msglen,
-										0);
+							if (sd != client_socket[j]) {
+								send(client_socket[j], buffer, msglen, 0);
+								cout << "sockfd " << client_socket[j]
+										<< ": sent " << msglen << " bytes!"
+										<< endl;
+							}
 						}
 					}
-
-					//send(where_to_send, buffer, strlen(buffer), 0);
 				}
 			}
 		}
 	}
-
-	/* listen to the socket.
-	 * two cases:
-	 * 1. connection open/close request from stations/routers
-	 * 2. regular data packets
-	 */
 
 	close(bridgeSockfd);
 	return 0;

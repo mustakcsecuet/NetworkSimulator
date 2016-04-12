@@ -46,6 +46,7 @@ typedef struct rtable {
 typedef struct arpcache {
     IPAddr ipaddr;
     MacAddr macaddr;
+    int ttl;
 } Arpc;
 
 /*--------------------------------------------------------------------*/
@@ -129,11 +130,11 @@ int intr_cnt; /* counter for interface */
 Rtable rt_table[MAXHOSTS*MAXINTER];
 int rt_cnt;
 
-Arpc arpCacheList[MAXHOSTS];
-int arp_cache_counter;
-
 PENDING_QUEUE *pending_queue;
 
 int ROUTER;
+
+int timeout = 15;  /* timeout is 15 seconds */
+int interval = 1; /* check interval */
 
 #endif

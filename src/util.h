@@ -90,7 +90,7 @@ int compareMac(MacAddr first, MacAddr second) {
 	int i, c;
 	c = 0;
 	for (i = 0; i < 6; i++) {
-		if (first[i] == second[i])
+		if ((first[i]&second[i]) == first[i])
 			c++;
 	}
 	if (c == 6)
@@ -103,6 +103,12 @@ void setEmpty(MacAddr temp) {
 
 	for (i = 0; i < 6; i++) {
 		temp[i] = 0;
+	}
+}
+
+void setFF(MacAddr temp) {
+	for (int i = 0; i < 6; i++) {
+		temp[i] = 0xff;
 	}
 }
 
