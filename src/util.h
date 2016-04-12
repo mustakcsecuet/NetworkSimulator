@@ -14,11 +14,10 @@
 using namespace std;
 
 std::string trim(const std::string& str,
-		const std::string& whitespace = " \t")
-{
+		const std::string& whitespace = " \t") {
 	const unsigned strBegin = str.find_first_not_of(whitespace);
 	if (strBegin == std::string::npos)
-	return ""; // no content
+		return ""; // no content
 
 	const unsigned strEnd = str.find_last_not_of(whitespace);
 	const unsigned strRange = strEnd - strBegin + 1;
@@ -26,7 +25,8 @@ std::string trim(const std::string& str,
 	return str.substr(strBegin, strRange);
 }
 
-std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
+std::vector<std::string> &split(const std::string &s, char delim,
+		std::vector<std::string> &elems) {
 	std::stringstream ss(s);
 	std::string item;
 	while (std::getline(ss, item, delim)) {
@@ -37,7 +37,7 @@ std::vector<std::string> &split(const std::string &s, char delim, std::vector<st
 }
 
 std::vector<std::string> split(const std::string &s, char delim) {
-	std::vector<std::string> elems;
+	std::vector < std::string > elems;
 	split(s, delim, elems);
 
 	return elems;
@@ -47,12 +47,12 @@ map<string, string> loadConf(string file, char delim) {
 	ifstream ifs(file.c_str());
 
 	string line;
-	map<string, string> conf;
+	map < string, string > conf;
 	while (std::getline(ifs, line, '\n')) {
 		line = trim(line);
 		if (line.length() < 1)
-		continue;
-		vector<string> res = split(line, delim);
+			continue;
+		vector < string > res = split(line, delim);
 		if (res.size() < 2) {
 			cout << "conf error: " << line << endl;
 		}
@@ -64,7 +64,7 @@ map<string, string> loadConf(string file, char delim) {
 
 void bytes_to_string(byte *buf, int n, string &key) {
 	for (int i = 0; i < n; i++)
-	key.append(1, (char)buf[i]);
+		key.append(1, (char) buf[i]);
 }
 
 /* remove the whitespace at the beginning and ending of buffer */
@@ -108,8 +108,8 @@ void setEmpty(MacAddr temp) {
 
 void printIP(char *msg, IPAddr ip) {
 	struct in_addr ip_addr;
-    ip_addr.s_addr = ip;
-    printf("%s : %s\n", msg, inet_ntoa(ip_addr));
+	ip_addr.s_addr = ip;
+	printf("%s : %s\n", msg, inet_ntoa(ip_addr));
 }
 
 void printMac(char *msg, MacAddr mac) {
@@ -120,14 +120,20 @@ void printMac(char *msg, MacAddr mac) {
 	printf("\n");
 }
 
+char *int_to_ip(IPAddr ip) {
+	struct in_addr ip_addr;
+	ip_addr.s_addr = ip;
+	return inet_ntoa(ip_addr);
+}
+
 void printInformation(IPAddr srcIP, IPAddr dstIP, MacAddr srcMac,
 		MacAddr dstMac) {
 	printf("Information:\n");
 
-	printIP((char*)"Source IP", srcIP);
-	printIP((char*)"Destination IP", dstIP);
-	printMac((char*)"Source Mac", srcMac);
-	printMac((char*)"Dsetnation Mac", dstMac);
+	printIP((char*) "Source IP", srcIP);
+	printIP((char*) "Destination IP", dstIP);
+	printMac((char*) "Source Mac", srcMac);
+	printMac((char*) "Dsetnation Mac", dstMac);
 }
 
 #endif /* UTIL_H_ */
