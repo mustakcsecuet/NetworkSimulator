@@ -48,15 +48,15 @@ void *ARP_timer_thread(void *arg) {
 void updateTimer(IPAddr ip, MacAddr mac) {
 	int i;
 	/*
-	pthread_mutex_lock(&mutex);
-	for (i = 0; i < (int) arpCacheList.size(); i++) {
-		if (arpCacheList[i].ipaddr == ip) {
-			arpCacheList[i].createTime = time(NULL);
-			break;
-		}
-	}
-	pthread_mutex_unlock(&mutex);
-	*/
+	 pthread_mutex_lock(&mutex);
+	 for (i = 0; i < (int) arpCacheList.size(); i++) {
+	 if (arpCacheList[i].ipaddr == ip) {
+	 arpCacheList[i].createTime = time(NULL);
+	 break;
+	 }
+	 }
+	 pthread_mutex_unlock(&mutex);
+	 */
 }
 
 void showArp() {
@@ -210,10 +210,10 @@ int isSameNetwork(IPAddr destSubnet, IPAddr mask, IPAddr checkIP) {
 	return 0;
 }
 
-int getSocket(char *lanName) {
+int getSocket(char *ifaceName) {
 	int i;
 	for (i = 0; i < (int) iface_links.size(); i++) {
-		if (strcmp(iface_links[i].ifacename, lanName) == 0)
+		if (strcmp(iface_links[i].ifacename, ifaceName) == 0)
 			return i;
 	}
 
@@ -416,7 +416,7 @@ int connBridge(int pos, char *ip, int port) {
 		if (strcmp("accept", r_buffer) == 0) {
 			ITF2LINK link;
 			link.sockfd = servSocket;
-			strcpy(link.ifacename, iface_list[pos].lanname);
+			strcpy(link.ifacename, iface_list[pos].ifacename);
 			iface_links.push_back(link);
 			break;
 		} else {
@@ -498,7 +498,7 @@ void sendInputMsg(char *data, Rtable rtabl, MacAddr srcAddr, MacAddr dstAddr,
 	// get socket information
 	int toIntf = getIfaceByName(rtabl.ifacename);
 
-	int toSocket = getSocket(iface_list[toIntf].lanname);
+	int toSocket = getSocket(iface_list[toIntf].ifacename);
 
 	int sock = iface_links[toSocket].sockfd;
 	if (sock < 0) {
@@ -537,7 +537,7 @@ void sendPendingPacket(byte *oriPacket, int size, Rtable dstRtabl, int type,
 	// get socket information
 	int toIntf = getIfaceByName(dstRtabl.ifacename);
 
-	int toSocket = getSocket(iface_list[toIntf].lanname);
+	int toSocket = getSocket(iface_list[toIntf].ifacename);
 
 	int sock = iface_links[toSocket].sockfd;
 	if (sock < 0) {
@@ -681,6 +681,10 @@ void reply(IPAddr srcIP, IPAddr dstIP, MacAddr dstMac) {
 	Rtable dstRtabl = rt_table[pi];
 
 	int toIntf = getIfaceByName(dstRtabl.ifacename);
+	if (toIntf < 0) {
+		cout << "reply cannot get ifacebyname: " << dstRtabl.ifacename << endl;
+		return;
+	}
 
 	MacAddr srcMac;
 	memcpy(srcMac, iface_list[toIntf].macaddr, 6);
@@ -720,6 +724,11 @@ void procRevMsg(char *data, int size, int fromSock) {
 	int ifacePos = getIfaceNameBySock(fromSock);
 	// get source IP and MAC address
 	int toIntf = getIfaceByName(iface_links[ifacePos].ifacename);
+	if (toIntf < 0) {
+		cout << "procRevMsg cannot get ifacebyname: "
+				<< iface_links[ifacePos].ifacename << endl;
+		return;
+	}
 
 	//get my Mac IP
 	MacAddr myMac;
@@ -754,6 +763,9 @@ void procRevMsg(char *data, int size, int fromSock) {
 			int queID = getPendingPacket(srcIP);
 			PENDING_QUEUE pending = pkt_que[queID];
 
+			//cout << "remove queue: " << queID << ", ip: " << src_ip << endl;
+			pkt_que.erase(pkt_que.begin() + queID);
+
 			int pi = getRouting(dstIP);
 			if (pi < 0) {
 				cout << "no suitable rtable entry to forward" << endl;
@@ -773,6 +785,10 @@ void procRevMsg(char *data, int size, int fromSock) {
 			storeInArpCache(srcIP, srcAddr);
 
 			int toWho = getHostByIP(srcIP);
+			if (toWho < 0) {
+				cout << "procRevMsg cannot get hostbyip: " << srcIP << endl;
+				return;
+			}
 			cout << "\nThe message is from host " << host[toWho].name << endl;
 			cout << "Content: " << msg << endl << endl;
 			printIpPack(msg, srcIP, dstIP);
@@ -786,6 +802,11 @@ void forwardIPPacket(char *oriMsg, int oriSize, IPAddr oriDstIP,
 	cout << "Forward it" << endl;
 	// get destination ip address
 	int toWho = getHostByIP(oriDstIP);
+	if (toWho < 0) {
+		cout << "procRevMsg cannot get hostbyip: " << oriDstIP << endl;
+		return;
+	}
+
 	int pi = getHost(host[toWho].name);
 	if (pi < 0) {
 		cout << "no such host" << endl;
@@ -813,6 +834,11 @@ void forwardIPPacket(char *oriMsg, int oriSize, IPAddr oriDstIP,
 
 	// get source IP and MAC address
 	int toIntf = getIfaceByName(dstRtabl.ifacename);
+	if (toIntf < 0) {
+		cout << "forwardIPPacket cannot get ifacebyname: " << dstRtabl.ifacename
+				<< endl;
+		return;
+	}
 
 	//get source IP
 	IPAddr srcIP;
@@ -884,9 +910,18 @@ void procRouterRevMsg(char *data, int size, int fromSock) {
 	printMac((char *) "Destination MAC address of the Ethernet header is",
 			revDstMac);
 	int ifacePos = getIfaceNameBySock(fromSock);
+	if (ifacePos < 0) {
+		cout << "procRouterRevMsg: cannot get ifacenamebySock: " << fromSock
+				<< endl;
+		return;
+	}
 	// get source IP and MAC address
 	int toIntf = getIfaceByName(iface_links[ifacePos].ifacename);
-
+	if (toIntf < 0) {
+		cout << "procRouterRevMsg: cannot get ifacebyname: "
+				<< iface_links[ifacePos].ifacename << endl;
+		return;
+	}
 	//get my Mac IP
 	MacAddr myMac;
 	memcpy(myMac, iface_list[toIntf].macaddr, 6);
@@ -917,6 +952,9 @@ void procRouterRevMsg(char *data, int size, int fromSock) {
 			// Retrieve original packet from queue
 			int queID = getPendingPacket(srcIP);
 			PENDING_QUEUE pending = pkt_que[queID];
+
+			cout << "remove queue: " << queID << ", ip: " << src_ip << endl;
+			pkt_que.erase(pkt_que.begin() + queID);
 
 			int pi = getRouting(dstIP);
 			if (pi < 0) {
