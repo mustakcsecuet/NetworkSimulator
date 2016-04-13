@@ -47,16 +47,15 @@ void *ARP_timer_thread(void *arg) {
  */
 void updateTimer(IPAddr ip, MacAddr mac) {
 	int i;
-	/*
-	 pthread_mutex_lock(&mutex);
-	 for (i = 0; i < (int) arpCacheList.size(); i++) {
-	 if (arpCacheList[i].ipaddr == ip) {
-	 arpCacheList[i].createTime = time(NULL);
-	 break;
-	 }
-	 }
-	 pthread_mutex_unlock(&mutex);
-	 */
+
+	pthread_mutex_lock(&mutex);
+	for (i = 0; i < (int) arpCacheList.size(); i++) {
+		if (arpCacheList[i].ipaddr == ip) {
+			arpCacheList[i].createTime = time(NULL);
+			break;
+		}
+	}
+	pthread_mutex_unlock(&mutex);
 }
 
 void showArp() {
@@ -953,7 +952,7 @@ void procRouterRevMsg(char *data, int size, int fromSock) {
 			int queID = getPendingPacket(srcIP);
 			PENDING_QUEUE pending = pkt_que[queID];
 
-			cout << "remove queue: " << queID << ", ip: " << src_ip << endl;
+			//cout << "remove queue: " << queID << ", ip: " << src_ip << endl;
 			pkt_que.erase(pkt_que.begin() + queID);
 
 			int pi = getRouting(dstIP);
@@ -989,6 +988,12 @@ void clean() {
 		itv++;
 	}
 	iface_links.clear();
+
+	for (int i = 0; i < (int) pkt_que.size(); i++) {
+		PENDING_QUEUE que = pkt_que[i];
+		delete[] que.packet;
+	}
+	pkt_que.clear();
 }
 
 void station() {
