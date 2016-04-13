@@ -1,6 +1,7 @@
 #ifndef IP_H
 #define IP_H
 #include "ether.h"
+#include <time.h>
 
 /* ARP packet types */
 #define ARP_REQUEST 0
@@ -46,7 +47,7 @@ typedef struct rtable {
 typedef struct arpcache {
     IPAddr ipaddr;
     MacAddr macaddr;
-    int ttl;
+    int createTime;
 } Arpc;
 
 /*--------------------------------------------------------------------*/
@@ -86,7 +87,8 @@ typedef struct p_queue
 {
   IPAddr next_hop_ipaddr;
   IPAddr dst_ipaddr;
-  char msg[BUFSIZ];
+  unsigned char *packet;
+  int length;
   
 } PENDING_QUEUE;
 
@@ -134,7 +136,6 @@ PENDING_QUEUE *pending_queue;
 
 int ROUTER;
 
-int timeout = 15;  /* timeout is 15 seconds */
-int interval = 1; /* check interval */
+int timeout = 5;  /* timeout is 5 seconds */
 
 #endif

@@ -86,6 +86,14 @@ char* remove_whitespace(char *buffer) {
 	return buffer;
 }
 
+void printMac(char *msg, MacAddr mac) {
+	int i;
+	printf("%s :", msg);
+	for (i = 0; i < 6; i++)
+		printf("%02x", mac[i]);
+	printf("\n");
+}
+
 int compareMac(MacAddr first, MacAddr second) {
 	int i, c;
 	c = 0;
@@ -112,24 +120,33 @@ void setFF(MacAddr temp) {
 	}
 }
 
+int isBroadcast(MacAddr temp) {
+	int yes = 1;
+	for (int i = 0; i < 6; i++) {
+		if (temp[i] != 0xff) {
+			yes = 0;
+			break;
+		}
+	}
+	return yes;
+}
+
 void printIP(char *msg, IPAddr ip) {
 	struct in_addr ip_addr;
 	ip_addr.s_addr = ip;
 	printf("%s : %s\n", msg, inet_ntoa(ip_addr));
 }
 
-void printMac(char *msg, MacAddr mac) {
-	int i;
-	printf("%s :", msg);
-	for (i = 0; i < 6; i++)
-		printf("%02x", mac[i]);
-	printf("\n");
-}
-
+/*
 char *int_to_ip(IPAddr ip) {
 	struct in_addr ip_addr;
 	ip_addr.s_addr = ip;
 	return inet_ntoa(ip_addr);
+}*/
+
+void int_to_ip(IPAddr ip, char *res) {
+	//ip = htonl(ip);
+	inet_ntop(AF_INET, &ip, res, 16);
 }
 
 void printInformation(IPAddr srcIP, IPAddr dstIP, MacAddr srcMac,

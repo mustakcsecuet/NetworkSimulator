@@ -86,4 +86,5 @@
 
 7. Assumptions
 	1) The maximum length of one message is 1000.
-	2) The TTL for cache is 15 seconds.	
+	2) The TTL for cache is 5 seconds.
+	3) Need to input 'Enter' to get the prompt.	

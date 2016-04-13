@@ -13,7 +13,7 @@ int mNumPorts;
 typedef struct macSocket {
 	MacAddr mac;
 	int socket;
-	int ttl;
+	int createTime;
 	int port;
 } MACSKT;
 
@@ -30,7 +30,7 @@ void pushToLearning(MacAddr mac, int socket, int port) {
 		MACSKT entry = *it;
 		if (compareMac(entry.mac, mac) == 0) {
 			//update timer
-			entry.ttl = timeout;
+			entry.createTime = time(NULL);
 			old = 1;
 			break;
 		}
@@ -41,7 +41,7 @@ void pushToLearning(MacAddr mac, int socket, int port) {
 		MACSKT entry;
 		memcpy(entry.mac, mac, 6);
 		entry.socket = socket;
-		entry.ttl = timeout;
+		entry.createTime = time(NULL);
 		entry.port = port;
 		learningTable.push_back(entry);
 	}
@@ -49,12 +49,16 @@ void pushToLearning(MacAddr mac, int socket, int port) {
 }
 
 int getSocketFromLearning(MacAddr mac) {
-	pthread_mutex_lock(&mutex);
 	int i, res = -1;
-	for (i = 0; i < (int) learningTable.size(); i++) {
-		if (compareMac(learningTable[i].mac, mac) == 0) {
-			res = i;
-			break;
+	pthread_mutex_lock(&mutex);
+	if (isBroadcast(mac)) {
+		printMac((char *) "broadcast", mac);
+	} else {
+		for (i = 0; i < (int) learningTable.size(); i++) {
+			if (compareMac(learningTable[i].mac, mac) == 0) {
+				res = i;
+				break;
+			}
 		}
 	}
 	pthread_mutex_unlock(&mutex);
@@ -65,22 +69,23 @@ int getSocketFromLearning(MacAddr mac) {
 void *SL_timer_thread(void *arg) {
 	while (is_run) {
 		//check every second
-		sleep(interval);
+		sleep(1);
 
 		pthread_mutex_lock(&mutex);
 		vector<MACSKT>::iterator it = learningTable.begin();
 		while (it != learningTable.end()) {
 			MACSKT entry = *it;
-			entry.ttl -= interval;
+			int ttl = timeout-(time(NULL)-entry.createTime);
 
 			//remove it
-			if (entry.ttl < 1) {
-				cout << "One entry in SL table timed out:" << endl;
+			if (ttl < 1) {
+				cout << "\nOne entry in SL table timed out:" << endl;
 				cout << "MAC address: ";
-				for (int i = 0; i < 6; i++)
-					printf("%02x", entry.mac[i]);
+				for (int i = 0; i < 5; i++)
+					printf("%02x:", entry.mac[i]);
+				printf("%02x", entry.mac[5]);
 				cout << "\tPort: " << entry.port << " Sockfd: " << entry.socket
-						<< "\tTTL: " << entry.ttl << endl;
+						<< "\tTTL: " << ttl << endl;
 				it = learningTable.erase(it);
 				continue;
 			}
@@ -110,8 +115,9 @@ void show() {
 		cout << "MAC address: ";
 		for (int j = 0; j < 6; j++)
 			printf("%02x", entry.mac[j]);
+		int ttl = timeout-(time(NULL)-entry.createTime);
 		cout << "\tPort: " << entry.port << " Sockfd: " << entry.socket
-				<< "\tTTL: " << entry.ttl << endl;
+				<< "\tTTL: " << ttl << endl;
 	}
 	cout << "**********************************" << endl << endl;
 }
@@ -128,10 +134,7 @@ int main(int argc, char *argv[]) {
 	char bridgeIP[100];
 	int bridgePortNo;
 
-	fd_set readfds;
-	int max_sd, sd, clCounter;
-
-	int activity, msglen;
+	int msglen;
 	int i;
 	char welcome_msg[200];
 	char buffer[1024];
@@ -144,10 +147,7 @@ int main(int argc, char *argv[]) {
 	strcpy(mLanName, argv[1]);
 
 	mNumPorts = atoi(argv[2]);
-	int client_socket[mNumPorts];
-	for (i = 0; i < mNumPorts; i++) {
-		client_socket[i] = 0;
-	}
+	vector<int> client_socket;
 
 	bridgeSockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (bridgeSockfd < 0)
@@ -194,7 +194,6 @@ int main(int argc, char *argv[]) {
 	symlink(temp, linkPortName);
 
 	clilen = sizeof(cli_addr);
-	clCounter = 0;
 
 	//timer thread
 	pthread_create(&timer_thread, NULL, SL_timer_thread, (void*) NULL);
@@ -208,46 +207,39 @@ int main(int argc, char *argv[]) {
 
 	string line;
 	char buf[BUFSIZ];
-	while (1) {
-		// clear the socket set
-		FD_ZERO(&readfds);
+	fd_set r_set, all_set;
+	int max_fd = -1;
+	FD_ZERO(&all_set);
 
-		// add master socket to set
-		FD_SET(bridgeSockfd, &readfds);
-		max_sd = bridgeSockfd;
-		FD_SET(in_fd, &readfds);
-		max_sd = max(in_fd, max_sd);
+	// add master socket to set
+	FD_SET(bridgeSockfd, &all_set);
+	max_fd = bridgeSockfd;
+	FD_SET(in_fd, &all_set);
+	max_fd = max(in_fd, max_fd);
 
-		// add child sockets to set
-		for (i = 0; i < mNumPorts; i++) {
-			// socket descriptor
-			sd = client_socket[i];
+	for (;;) {
+		r_set = all_set;
+		select(max_fd + 1, &r_set, NULL, NULL, NULL);
 
-			// if valid socket descriptor then add to read list
-			if (sd > 0)
-				FD_SET(sd, &readfds);
-
-			// highest file descriptor number, need it for the select function
-			if (sd > max_sd)
-				max_sd = sd;
-		}
-
-		// wait for an activity on one of the sockets , timeout is NULL , so wait indefinitely
-		activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
-
-		if ((activity < 0) && (errno != EINTR)) {
-			printf("select error");
-		}
-
-		if (FD_ISSET(in_fd, &readfds)) {
+		if (FD_ISSET(in_fd, &r_set)) {
 			//input from user
-			getline(cin, line);
+			if (fgets(buf, BUFSIZ, stdin)) {
+			} else {
+				if (errno && (errno != ECHILD)) {
+					if (errno == EINTR)
+						continue;
+					perror("BRIDGE");
+					exit (EXIT_FAILURE);
+				} else
+					/* EOF */
+					clean();
+				break;
+			}
 			/* close the bridge */
 			if (strncmp(buf, "quit", 4) == 0) {
 				//close all connections
-				for (i = 0; i < mNumPorts; i++) {
-					if (client_socket[i] > 0)
-						close(client_socket[i]);
+				for (i = 0; i < (int) client_socket.size(); i++) {
+					close(client_socket[i]);
 				}
 				clean();
 				break;
@@ -256,18 +248,15 @@ int main(int argc, char *argv[]) {
 			if (strncmp(buf, "show sl", 7) == 0)
 				show();
 		}
-
 		// If something happened on the master socket , then its an incoming connection
-		if (FD_ISSET(bridgeSockfd, &readfds)) {
+		if (FD_ISSET(bridgeSockfd, &r_set)) {
 			if ((newConnectionSockfd = accept(bridgeSockfd,
 					(struct sockaddr *) &cli_addr, (socklen_t*) &clilen)) < 0) {
 				perror("accept");
 				exit (EXIT_FAILURE);
 			}
-			// new client information
-			clCounter++;
 
-			if (clCounter <= mNumPorts) {
+			if ((int) client_socket.size() < mNumPorts) {
 				// send successful connection greeting message
 				sprintf(welcome_msg, "accept");
 				if (send(newConnectionSockfd, welcome_msg, strlen(welcome_msg),
@@ -276,15 +265,11 @@ int main(int argc, char *argv[]) {
 				}
 
 				// add new socket to array of sockets
-				for (i = 0; i < mNumPorts; i++) {
-					// if position is empty
-					if (client_socket[i] == 0) {
-						client_socket[i] = newConnectionSockfd;
-						break;
-					}
-				}
+				client_socket.push_back(newConnectionSockfd);
 				printf("accept a new host on sockfd %d, port %d!\n",
-						newConnectionSockfd, i);
+						newConnectionSockfd, (int) (client_socket.size() - 1));
+				FD_SET(newConnectionSockfd, &all_set);
+				max_fd = max(max_fd, newConnectionSockfd);
 			} else {
 				// send reject connection message
 				sprintf(welcome_msg, "reject");
@@ -298,21 +283,22 @@ int main(int argc, char *argv[]) {
 
 		memset(buffer, '\0', 1024);
 
-		// else its some IO operation on some other socket :)
-		for (i = 0; i < mNumPorts; i++) {
-			sd = client_socket[i];
-
-			if (FD_ISSET(sd, &readfds)) {
+		vector<int>::iterator it = client_socket.begin();
+		i = 0;
+		while (it != client_socket.end()) {
+			int sd = *it;
+			if (FD_ISSET(sd, &r_set)) {
 				// Check if it was for closing , and also read the incoming message
 				if ((msglen = read(sd, buffer, 1024)) <= 0) {
-					// Somebody disconnected , get his details and print
 					//getpeername(sd, (struct sockaddr*) &cli_addr, (socklen_t*) &clilen);
 					cout << "host on port " << i << " disconnected" << endl;
 
 					// Close the socket and mark as 0 in list for reuse
 					close(sd);
-					client_socket[i] = 0;
-					clCounter--;
+					FD_CLR(sd, &all_set);
+					it = client_socket.erase(it);
+					i++;
+					continue;
 				}
 
 				// Forward the message that came in
@@ -352,16 +338,11 @@ int main(int argc, char *argv[]) {
 					// INFO lookup for interface name for that mac address
 					// INFO and add it to the link_socket table
 
-					// CALL pushToLearning(MacAddr macAddress, int socket i.e. sd here)
-					pushToLearning(srcAddr, sd, i);
-
 					// TODO forward message according to larningg table
 					// INFO first look for the learning table if we already
 					// INFO know which socket to forward
 					// INFO if socket informaiton is not in learning table
 					// INFO broadcast to all socket except the socket sd
-
-					// CALL getSocketFromLearning(MacAddr mac)
 
 					int toSocket = getSocketFromLearning(dstAddr);
 
@@ -377,7 +358,7 @@ int main(int argc, char *argv[]) {
 					} else {
 						cout << "send to all ports" << endl;
 						int j;
-						for (j = 0; j < mNumPorts; j++) {
+						for (j = 0; j < (int) client_socket.size(); j++) {
 							if (sd != client_socket[j]) {
 								send(client_socket[j], buffer, msglen, 0);
 								cout << "sockfd " << client_socket[j]
@@ -386,8 +367,13 @@ int main(int argc, char *argv[]) {
 							}
 						}
 					}
+					// CALL pushToLearning(MacAddr macAddress, int socket i.e. sd here)
+					pushToLearning(srcAddr, sd, i);
 				}
 			}
+
+			it++;
+			i++;
 		}
 	}
 
