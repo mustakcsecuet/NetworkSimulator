@@ -1,0 +1,89 @@
+#####################################################
+# Developped by Mustakimur Rahman Khandaker & Yongjiang Liang for the course
+#
+# DATA/COMPUTER COMMUN (CNT5505-01.sp16)  
+# Computer Science, FSU
+#####################################################
+
+
+1. Author/email address
+
+	Mustakimur Rahman Khandaker (mrk15e@my.fsu.edu)
+	Yongjiang Liang (yl14u@my.fsu.edu)
+
+2. How to compile the code
+
+    platform: linux
+    just type "make"
+
+
+3. Commands supported in stations/routers/bridges
+
+   3.1 stations:
+
+	   send <destination> <message> // send message to a destination host
+	   show arp 		// show the ARP cache table information
+	   show pq 		// show the pending_queue
+	   show	host 		// show the IP/name mapping table
+	   show	iface 		// show the interface information
+	   show	rtable 		// show the contents of routing table
+	   quit // close the station
+
+   3.2 routers:
+
+	   show	arp 		// show the ARP cache table information
+	   show	pq 		// show the pending_queue
+	   show	host 		// show the IP/name mapping table
+	   show	iface 		// show the interface information
+	   show	rtable 		// show the contents of routing table
+	   quit // close the router
+
+
+   3.3 bridges:
+
+	   show sl 		// show the contents of self-learning table
+	   quit // close the bridge
+
+
+4. To start the emulation, run
+
+   	run_simulation
+
+   , which emulates the following network topology
+
+   
+          B              C                D
+          |              |                |
+         cs1-----R1------cs2------R2-----cs3
+          |              |                |
+          -------A--------                E
+
+    cs1, cs2, and cs3 are bridges.
+    R1 and R2 are routers.
+    A to E are hosts/stations.
+    Note that A is multi-homed, but it is not a router.
+
+
+5. Difficulties that we have encountered during the development of the project
+
+	1) we are not quite sure how to forward ip packet hop by hop, 
+	   then we run the DEMO many times to figure out how one packet go from one hop to another;
+	2) continuously use inet_ntoa will print out same ip address, then we decide use inet_ntop;
+	3) it's not easier to convert structures to byte array, also hard to extract structures from byte array,
+	   then we design ByteIO/DataIO classes for byte array extraction;
+	4) we are now familiar with ARP, so we have to check the printout of DEMO to learn more about it;
+
+6. A LOG of the progress we make from time to time
+	
+	1) Add server model into bridge.cpp, add client model into station.cpp; 
+	   Use select() funciton for I/O multiplexing;
+	2) Add self learning into bridge, design ByteIO/DataIO classes for byte arry extraction;
+	3) Add send/forward IP packets into bridge, and forward IP packets into router;
+	4) Add ARP protocol into bridge/router;
+	5) Add timeout to check cache into bridge/router/station;
+	6) Add commands to show information on bridge/router/station;
+
+
+7. Assumptions
+	1) The maximum length of one message is 1000.
+	2) The TTL for cache is 15 seconds.	
