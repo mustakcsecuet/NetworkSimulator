@@ -1,3 +1,13 @@
+/*
+ * Course: CNT5505-01, DATA/COMPUTER COMMUN
+ * Semester: Spring 2016
+ * Names:
+ * 		Mustakimur Rahman Khandaker (mrk15e@my.fsu.edu)
+ *      Yongjiang Liang (yl14u@my.fsu.edu)
+ *
+ */
+
+
 /*----------------------------------------------------------------*/
 #include "ip.h"
 #include "head.h"

@@ -1,3 +1,12 @@
+/*
+ * Course: CNT5505-01, DATA/COMPUTER COMMUN
+ * Semester: Spring 2016
+ * Names:
+ * 		Mustakimur Rahman Khandaker (mrk15e@my.fsu.edu)
+ *      Yongjiang Liang (yl14u@my.fsu.edu)
+ *
+ */
+
 #ifndef IP_H
 #define IP_H
 #include "ether.h"
@@ -136,6 +145,6 @@ PENDING_QUEUE *pending_queue;
 
 int ROUTER;
 
-int timeout = 5;  /* timeout is 5 seconds */
+int timeout = 15;  /* timeout is 15 seconds */
 
 #endif
