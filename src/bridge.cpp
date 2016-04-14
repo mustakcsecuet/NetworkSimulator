@@ -244,7 +244,6 @@ int main(int argc, char *argv[]) {
 				clean();
 				break;
 			}
-			strcpy(buf, line.c_str());
 			if (strncmp(buf, "show sl", 7) == 0)
 				show();
 		}
